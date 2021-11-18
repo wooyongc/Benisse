@@ -45,14 +45,14 @@ pip install numpy
 
 3. Single B cell expression matrix in csv format. Used by the core Benisse model. See **suggested pre-processing workflow** for pre-processing. Also easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig_exp.csv).
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC.png" width="700">
 
 **Fig.1 |** An example input of a BCR heavy chain sequence file
 
 
 2. Single B cell expression matrix in .csv format. Easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_exp.csv).
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC_exp.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC_exp.png" width="700">
 
 **Fig.2 |** An example of B cell expression matrix
 
@@ -85,7 +85,7 @@ python3 AchillesEncoder.py \
 ```
 This script generates the numerical BCR embedding, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/encoded_10x_NSCLC.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/encoded_10x_NSCLC.png" width="700">
 
 **Fig.3 |** An example BCR embedding generated
 
@@ -132,11 +132,11 @@ After the R script has been run, it will output the following files:
 
 
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png" width="700">
 
 **Fig.4 |** An example of connectionplot.pdf
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check_pdf.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check.png" width="700">
 
 **Fig.5 |** An example of in_cross_dist_check_pdf
 
