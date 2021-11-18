@@ -4,7 +4,7 @@
 
 Benisse (**B**CR **e**mbedding graphical **n**etwork **i**nformed by **s**cRNA-**S**eq) provides a powerful tool for analyzing B cell receptors (BCRs) guided by single cell gene expression of the B cells. As BCR affinity maturation is mainly controlled by signals obtained by B cells through BCRs with varying antigen binding strengths, B cells with similar BCR sequences are likely to have similar gene expression. Our deep contrastive learning model numerically embeds BCR CDR3H amino acid sequences, and Benisse employs a sparse graph learning model to capture the similarity between the BCRs and  single B cell expression.
 
-Please refer to our paper for more details: [paper](link)
+Please refer to our paper for more details: TBA
 
 Researchers searching for more bioinformatics tools please visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
 
@@ -14,6 +14,7 @@ Python (version 3.7), R (version 4.0.2), Linux (x86_64-redhat-linux-gn) shell (4
 **Python Packages**
 
 pytorch (version 1.10.0), pandas (version 1.3.4), and sklearn (version 1.0), numpy (version 1.21.3)
+
 **R Packages**
 
 R UMAP (version 0.2.7.0) and Rtsne (version 0.15). Pseudotime inference was performed by [Monocle2](http://cole-trapnell-lab.github.io/monocle-release/docs/)
@@ -24,7 +25,7 @@ In this tutorial, we will show a complete workflow for the Benisse. The toy exam
 ### Installation
 We recommend that you set up a python virtual environment for the BCR encoder using the commands below.
 ```{shell}
-cd *Your_Directory*/benisse
+cd path/to/Benisse
 # Following commands are used in high performance computing
 # module purge
 # module load shared
@@ -38,20 +39,20 @@ pip install numpy
 ```
 
 ### Input data
-1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file. The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR b-chain CDR3 sequences), or a folder path where contains all and only BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/BENNISE/blob/main/example/10x_NSCLC.csv)
+1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file. The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR b-chain CDR3 sequences), or a folder path where contains all and only BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC.csv)
 
-2. BCR contig file in .csv format. Easily adaptable from 10X software’s output. Used by the core Benisse model. Example: [10x_NSCLC_contigs.csv](https://github.com/wooyongc/BENNISE/blob/main/example/10x_NSCLC_contig.csv)
+2. BCR contig file in .csv format. Easily adaptable from 10X software’s output. Used by the core Benisse model. Example: [10x_NSCLC_contigs.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig.csv)
 
-3. Single B cell expression matrix in csv format. Used by the core Benisse model. See *suggested pre-processing workflow* for pre-processing. Also easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/BENNISE/blob/main/example/10x_NSCLC_contig_exp.csv).
+3. Single B cell expression matrix in csv format. Used by the core Benisse model. See **suggested pre-processing workflow** for pre-processing. Also easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig_exp.csv).
 
-<img src="https://github.com/wooyongc/BENNISE/blob/main/figs/10x_NSCLC.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC.png" width="650">
 
 **Fig.1 |** An example input of a BCR heavy chain sequence file
 
 
-2. Single B cell expression matrix in .csv format. Easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/BENNISE/blob/main/example/10x_NSCLC_exp.csv).
+2. Single B cell expression matrix in .csv format. Easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_exp.csv).
 
-<img src="https://github.com/wooyongc/BENNISE/blob/main/figs/10x_NSCLC_exp.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC_exp.png" width="650">
 
 **Fig.2 |** An example of B cell expression matrix
 
@@ -82,9 +83,9 @@ python3 AchillesEncoder.py \
 --input_data example/10x_NSCLC.csv \
 --output_data example/encoded_10x_NSCLC.csv
 ```
-This script generates the numerical BCR embedding, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the *output* parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/BENNISE/blob/main/example/encoded_10x_NSCLC.csv)
+This script generates the numerical BCR embedding, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
 
-<img src="https://github.com/wooyongc/BENNISE/blob/main/figs/encoded_10x_NSCLC.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/encoded_10x_NSCLC.png" width="650">
 
 **Fig.3 |** An example BCR embedding generated
 
@@ -131,11 +132,11 @@ After the R script has been run, it will output the following files:
 
 
 
-<img src="https://github.com/wooyongc/BENNISE/blob/main/figs/connectionplot.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png" width="650">
 
 **Fig.4 |** An example of connectionplot.pdf
 
-<img src="https://github.com/wooyongc/BENNISE/blob/main/figs/in_cross_dist_check_pdf.png" width="650">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check_pdf.png" width="650">
 
 **Fig.5 |** An example of in_cross_dist_check_pdf
 
