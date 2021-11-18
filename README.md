@@ -20,7 +20,7 @@ pytorch (version 1.10.0), pandas (version 1.3.4), and sklearn (version 1.0), num
 R UMAP (version 0.2.7.0) and Rtsne (version 0.15). Pseudotime inference was performed by [Monocle2](http://cole-trapnell-lab.github.io/monocle-release/docs/)
 
 ## Guided tutorial
-In this tutorial, we will show a complete workflow for the Benisse. The toy example data we used in this tutorial are available on [github]() and on [figshare]().
+In this tutorial, we will show a complete workflow for the Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
 
 ### Installation
 We recommend that you set up a python virtual environment for the BCR encoder using the commands below.
