@@ -136,7 +136,7 @@ After the R script has been run, it will output the following files:
 
 **Fig.4 |** An example of connectionplot.pdf
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check.png" width="700">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check.png" width="400">
 
 **Fig.5 |** An example of in_cross_dist_check_pdf
 
