@@ -2,32 +2,32 @@
 # BENISSE
 ## Introduction
 
-Benisse (**B**CR **e**mbedding graphical **n**etwork **i**nformed by **s**cRNA-**S**eq) provides a powerful tool for analyzing B cell receptors (BCRs) guided by single cell gene expression of the B cells. As BCR affinity maturation is mainly controlled by signals obtained by B cells through BCRs with varying antigen binding strengths, B cells with similar BCR sequences are likely to have similar gene expression. Our deep contrastive learning model numerically embeds BCR CDR3H amino acid sequences, and Benisse employs a sparse graph learning model to capture the similarity between the BCRs and  single B cell expression.
+Benisse (**B**CR **e**mbedding graphical **n**etwork **i**nformed by **s**cRNA-**S**eq) provides a powerful tool for analyzing B cell receptors (BCRs) guided by single cell gene expression of the B cells. As BCR affinity maturation is controlled by signals obtained by B cells through the BCRs with varying antigen binding strengths, B cells with similar BCR sequences are likely to have similar transcriptomic profiles. Our deep contrastive learning model numerically embeds BCR CDR3H amino acid sequences, and Benisse employs a sparse graph learning model to capture the mutual information shared between the BCRs and single B cell expression, based upon the BCR encoder.
 
 Please refer to our paper for more details: TBA
 
-Researchers searching for more bioinformatics tools please visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
+Researchers searching for more immunology-related bioinformatics tools can visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
 
 ### Dependencies
-Python (version 3.7), R (version 4.0.2), Linux (x86_64-redhat-linux-gn) shell (4.2.46(2) preferred)
+Python (version 3.7), R (version 4.0.2)
 
 **Python Packages**
 
-pytorch (version 1.10.0), pandas (version 1.3.4), and sklearn (version 1.0), numpy (version 1.21.3)
+pytorch (version 1.10.0), pandas (version 1.3.4), sklearn (version 1.0), and numpy (version 1.21.3)
 
 **R Packages**
 
-R UMAP (version 0.2.7.0) and Rtsne (version 0.15). Pseudotime inference was performed by [Monocle2](http://cole-trapnell-lab.github.io/monocle-release/docs/)
+R UMAP (version 0.2.7.0) and Rtsne (version 0.15).
 
 ## Guided tutorial
-In this tutorial, we will show a complete workflow for the Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
+In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
 
 ### Installation
 We recommend that you set up a python virtual environment for the BCR encoder using the commands below.
 ```{shell}
 cd path/to/Benisse
-# Following commands are used in high performance computing
-# module purge
+# on our own servers. you may need to adapt these following three lines of codes to your system
+# module purge 
 # module load shared
 # module load python/3.7.x-anaconda
 python3 -m venv ./environment
@@ -39,7 +39,7 @@ pip install numpy
 ```
 
 ### Input data
-1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file. The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR b-chain CDR3 sequences), or a folder path where contains all and only BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC.csv)
+1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file (input file 2 below). The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR CDR3H sequences), or a folder path which contains all and only the BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC.csv)
 
 2. BCR contig file in .csv format. Easily adaptable from 10X software’s output. Used by the core Benisse model. Example: [10x_NSCLC_contigs.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig.csv)
 
@@ -73,8 +73,7 @@ The numerical BCR embedding script takes the following as input parameters:
 |Parameters|Description|
 |----------|-------|
 |input_data|A .csv file OR folder containing the BCR sequence data to be embedded|
-|model|The trained model to apply|
-|output_data|The path to output .csv file|
+|output_data|The path to the output .csv file|
 
 Usage:
 ```{shell}
@@ -83,7 +82,7 @@ python3 AchillesEncoder.py \
 --input_data example/10x_NSCLC.csv \
 --output_data example/encoded_10x_NSCLC.csv
 ```
-This script generates the numerical BCR embedding, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
+This script generates the numerical BCR embeddings, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
 
 <img src="https://github.com/wooyongc/Benisse/blob/main/figs/encoded_10x_NSCLC.png" width="700">
 
@@ -98,12 +97,12 @@ Using the generated BCR embedding, we can now run the R script, which is a spars
 |contigs|The BCR sequence data. Please refer to 10x_NSCLC_contigs.csv for format|
 |encoded BCR|The output file from AchillesEncoder.py|
 |output|The output path directory|
-|lambda2|Hyperparameter for Benisse|
-|gamma|Hyperparameter for Benisse|
+|lambda2|Hyperparameter for Benisse. Penalty strength for considering the single cell expression data in the generation of the BCR latent embedding. |
+|gamma|Hyperparameter for Benisse. Penalty term for the prior distribution of the latent space embedding. |
 |max_iter|Maximum iteration for the model to run|
-|lambda1|Hyperparameter for Benisse|
-|rho|Hyperparameter for Benisse|
-|m|Hyperparameter for Benisse|
+|lambda1|Hyperparameter for Benisse. Slack variable penalty for controlling for noise in the embedding. |
+|rho|Hyperparameter for Benisse. A parameter for executing the alternating direction method of multipliers algorithm. See Sup. Note 1 for details. |
+|m|Hyperparameter for Benisse. Dimension of the latent space. |
 |stop_cutoff|The variable is used to check the convergence. The algorithm stops if the mean squared distance between the sparse graph connection strength of the last 10 iterations is smaller than stop_cutoff|
 
 The following example code runs the core Benisse model. We recommend using the hyperparameters in the following example to start with. For detailed explanation of the hyperparameters, please refer to Supplementary Note 1. of our paper.
@@ -122,10 +121,10 @@ After the R script has been run, it will output the following files:
 
 |Output|Description|
 |----------|-------|
-|clone_annotation.csv|Meta annotation information of the BCR clonotypes for each contigs, such as cluster size and graph labels|
+|clone_annotation.csv|Meta annotation information of the BCR clonotypes, such as graph node labels and clone sizes |
 |cleaned_exp.txt|Expression data filtered by attributes in the contigs file|
-|clonality_label.txt|Corresponding relationship between B cells and B cell clonotypes|
-|sparse_graph.txt|A Sparse graph built by Benisse, where each node represents the B cell clonotype and edge weights represent the similarity between BCRs.|
+|clonality_label.txt|Corresponding relationship between individual B cells and B cell clonotypes|
+|sparse_graph.txt|A sparse graph built by Benisse, where each node represents the B cell clonotype and edge weights represent the similarity between BCRs.|
 |latent_dist.txt|Latent distances between the BCR clonotypes, learned by Benisse through the supervision of gene expression information|
 |connectionplot.pdf|Visualization of the graph representation of BCRs|
 |in_cross_dist_check.pdf|Visualization of the BCR distances in the latent space|
