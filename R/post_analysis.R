@@ -35,7 +35,7 @@ checkDist=function(Q,sparse_graph,crude_graph,path,hyper_para=NA){
   }
   if(is.na(path)){
     return(g)
-    }else{ggsave(plot=g,path=path,filename='/in_cross_dist_check.pdf',width=3,height=4)}
+    }else{ggsave(plot=g,path=path,filename='/in_cross_dist_check.pdf',width=3,height=4, dpi= 400)}
 }
 #3. plot clusters
 plotClusters=function(t,Q,SI,sparse_matrix,master_dist_e,name,path,
@@ -64,7 +64,7 @@ plotClusters=function(t,Q,SI,sparse_matrix,master_dist_e,name,path,
   }
   if(is.na(path)){
     return(g)
-  }else{ggsave(plot=g,path=path,filename='/connectionplot.pdf',width=8,height=8)}
+  }else{ggsave(plot=g,path=path,filename='/connectionplot.pdf',width=8,height=8, dpi= 400)}
 }
 #4. conver graph to cluster and test ARI
 convertCluster=function(sparse_graph){

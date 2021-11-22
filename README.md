@@ -132,11 +132,11 @@ After the R script has been run, it will output the following files:
 
 
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png" width="700">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png">
 
 **Fig.4 |** An example of connectionplot.pdf
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check.png" width="400">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/in_cross_dist_check.png">
 
 **Fig.5 |** An example of in_cross_dist_check_pdf
 
