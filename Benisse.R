@@ -110,8 +110,6 @@ write.table(exp_data,file=paste(save_path,"/cleaned_exp.txt",sep=""),
   quote=F)
 write.table(cdr3exp,file=paste(save_path,"/clonality_label.txt",sep=""),
             quote=F,row.names = F,col.names = F)
-write.table(cdr3exp,file=paste(save_path,"/clonality_label.txt",sep=""),
-            quote=F,row.names = F,col.names = F)
 write.table(results$A,file=paste(save_path,"/sparse_graph.txt",sep=""),
             quote=F,row.names = F,col.names = F)
 write.table(lat_t_dist,file=paste(save_path,"/latent_dist.txt",sep=""),
