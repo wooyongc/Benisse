@@ -53,7 +53,7 @@ contigs_refined=tmp$contigs_refined
 
 tmp=contigs_refined$IGH
 colnames(tmp)[3]='contigs'
-contigs_refined=tmp[!is.na(tmp$cdr3)&(!is.na(tmp$cdr3_nt)),]
+contigs_refined=tmp[!is.na(tmp$cdr3),]
 contigs_refined=contigs_refined[contigs_refined$barcode %in% colnames(exp_data),]
 exp_data=exp_data[,contigs_refined$barcode]
 
