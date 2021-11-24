@@ -27,7 +27,7 @@ We recommend that you set up a python virtual environment for the BCR encoder us
 ```{shell}
 cd path/to/Benisse
 # on our own servers. you may need to adapt these following three lines of codes to your system
-# module purge 
+# module purge
 # module load shared
 # module load python/3.7.x-anaconda
 python3 -m venv ./environment
@@ -131,7 +131,7 @@ After the R script has been run, it will output the following files:
 
 
 
-<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png">
+<img src="https://github.com/wooyongc/Benisse/blob/main/figs/connectionplot.png" width = "500">
 
 **Fig.4 |** An example of connectionplot.pdf
 
