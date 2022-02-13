@@ -38,6 +38,8 @@ pip install sklearn
 pip install numpy
 ```
 
+Installation time will be about 30min, depending on the computing system
+
 ### Input data
 1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file (input file 2 below). The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR CDR3H sequences), or a folder path which contains all and only the BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC.csv)
 
@@ -141,7 +143,7 @@ After the R script has been run, it will output the following files:
 
 
 
-
+The runtime on our example dataset should be <30min for both steps combined
 
 
 ## Version update
