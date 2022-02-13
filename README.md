@@ -121,13 +121,13 @@ After the R script has been run, it will output the following files:
 
 |Output|Description|
 |----------|-------|
-|clone_annotation.csv|Meta annotation information of the BCR clonotypes, such as graph node labels and clone sizes |
-|cleaned_exp.txt|Expression data filtered by attributes in the contigs file|
+|clone_annotation.csv|Meta annotation information of the BCR clonotypes, such as graph node labels and clone sizes|
+|cleaned_exp.txt|Expression data of the B cells|
 |clonality_label.txt|Corresponding relationship between individual B cells and B cell clonotypes|
-|sparse_graph.txt|A sparse graph built by Benisse, where each node represents the B cell clonotype and edge weights represent the similarity between BCRs.|
-|latent_dist.txt|Latent distances between the BCR clonotypes, learned by Benisse through the supervision of gene expression information|
-|connectionplot.pdf|Visualization of the graph representation of BCRs|
-|in_cross_dist_check.pdf|Visualization of the BCR distances in the latent space|
+|sparse_graph.txt|A sparse graph built by Benisse, where each node represents a B cell clonotype and edge weights represent the similarity between BCRs (higher is more similar)|
+|latent_dist.txt|Distances between the BCR clonotypes in the latent space, learned by Benisse through the supervision of gene expression information|
+|connectionplot.pdf|Visualization of the connection graph of BCR clonotypes in the latent space learned by Benisse|
+|in_cross_dist_check.pdf|Visualization of BCR distances in the latent space between different BCR clonotype pair types. Refer to Fig. 1f of our manuscript for more detailed explanation|
 
 
 
