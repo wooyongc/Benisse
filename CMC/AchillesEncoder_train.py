@@ -28,6 +28,9 @@ from data_util import Dataset
 from random import seed,sample
 from sklearn.metrics import roc_curve,auc
 
+def strtobool(v):
+    return v.lower() in ("yes", "true", "t", "1")
+
 def parse_option():
     parser=argparse.ArgumentParser('Arguments for training')
     parser.add_argument('--input_data',type=str,help='Folder that saved data used for training')
@@ -36,6 +39,7 @@ def parse_option():
     parser.add_argument('--break_point',default=None,type=str,help='The latest checkpoint file to load (default: none)')
     parser.add_argument('--encode_dim',type=int,default=40,help='Columns of padded atchley matrix (default: 80)')
     parser.add_argument('--pad_length',type=int,default=130,help='Length of padded nucleotide sequence (default: 130)')
+    parser.add_argument('--cuda', default=True, type=strtobool, help='Whether to use CUDA to train model')
     opt=parser.parse_args()
     return opt
 
@@ -65,7 +69,15 @@ if shuffle_dataset :
 train_indices, test_indices = indices[split:], indices[:split]
 
 #NCE average parameter
-device = "cuda: 0"
+if torch.cuda.is_available():
+    if args.cuda:
+        device = torch.device("cuda")
+    if not args.cuda:
+        print("Note: You have CUDA enabled but not using it.")
+        device = torch.device("cpu")
+else:
+    device = torch.device("cpu")
+
 cdr_shape = cdr_full[list(cdr_full.keys())[0]].shape[0]
 n_data = len(train_indices)
 n_data_test = len(test_indices)
@@ -93,10 +105,10 @@ weight_decay = 0.0001
 gradient_clip = 5
 
 # Set model
-model = MyAlexNetCMC(in_feature=in_feature,feat_dim=feat_dim).cuda()
-contrast = NCEAverage(n_out_features, n_data, nce_k, nce_t, nce_m).cuda()
-criterion_cdr = NCESoftmaxLoss().cuda()
-criterion_vdj = NCESoftmaxLoss().cuda()
+model = MyAlexNetCMC(in_feature=in_feature,feat_dim=feat_dim).to(device)
+contrast = NCEAverage(n_out_features, n_data, nce_k, device, nce_t, nce_m).to(device)
+criterion_cdr = NCESoftmaxLoss().to(device)
+criterion_vdj = NCESoftmaxLoss().to(device)
 
 # Set optimizer
 optimizer = torch.optim.SGD(model.parameters(),
@@ -139,9 +151,9 @@ def train(epoch, train_loader, model, contrast, criterion_cdr, criterion_vdj, op
         data_time.update(time.time() - end)
 
         batch_size = data['cdr'].size(0)
-        index = index.cuda()
+        index = index.to(device)
         for _ in data.keys():
-            data[_] = data[_].float().cuda()
+            data[_] = data[_].float().to(device)
         # ===================forward=====================
         feat_cdr, feat_vdj,cdr3_seq = model(data)
         out_cdr, out_vdj = contrast(feat_cdr, feat_vdj, index)

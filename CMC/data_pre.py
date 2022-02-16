@@ -19,7 +19,7 @@ def load_BCRdata(opt):
     for index,file in enumerate(datasets):
         if index % 10==0:
             print('Reading file:')
-            print(index)
+            print(file)
         f=pd.read_csv(file,header=0)
         if index==0:
             full_data=f[['contigs','cdr3','cdr3_nt']]
@@ -46,7 +46,7 @@ def load_BCRdata2(opt):
     for index,file in enumerate(datasets):
         if index % 10==0:
             print('Reading file:')
-            print(index)
+            print(file)
         f=pd.read_csv(file,header=0)
         if index==0:
             full_data=f[['contigs','cdr3']]

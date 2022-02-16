@@ -7,7 +7,7 @@ from alias_multinomial import AliasMethod
 
 class NCEAverage(nn.Module):
 
-    def __init__(self, input_size, output_size, K, T=0.07, momentum=0.5):
+    def __init__(self, input_size, output_size, K, device, T=0.07, momentum=0.5):
         """
         Args:
             input_size: n_features
@@ -19,7 +19,7 @@ class NCEAverage(nn.Module):
         self.output_size = output_size
         self.unigrams = torch.ones(self.output_size)
         self.multinomial = AliasMethod(self.unigrams)
-        self.multinomial.cuda()
+        self.multinomial.to(device)
         self.K = K
         self.register_buffer('params', torch.FloatTensor([K, T, momentum]))
         stdv = 1. / math.sqrt(input_size / 3)
@@ -99,7 +99,7 @@ class NCESoftmaxLoss(nn.Module):
     """Softmax cross-entropy loss"""
     def __init__(self):
         super(NCESoftmaxLoss, self).__init__()
-        #super spicified that only call the init function from NCESoftmasLoss
+        #super spicified that only call the init function from NCESoftmaxLoss
         #rather than nn.Module.
         self.criterion = nn.CrossEntropyLoss()
 

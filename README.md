@@ -17,7 +17,7 @@ pytorch (version 1.10.0), pandas (version 1.3.4), sklearn (version 1.0), and num
 
 **R Packages**
 
-R UMAP (version 0.2.7.0) and Rtsne (version 0.15).
+R UMAP (version 0.2.7.0), Rtsne (version 0.15) igraph (version 1.2.7).
 
 ## Guided tutorial
 In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
@@ -36,6 +36,7 @@ pip install torch
 pip install pandas
 pip install sklearn
 pip install numpy
+deactivate
 ```
 
 Installation time will be about 30min, depending on the computing system
@@ -76,13 +77,17 @@ The numerical BCR embedding script takes the following as input parameters:
 |----------|-------|
 |input_data|A .csv file OR folder containing the BCR sequence data to be embedded|
 |output_data|The path to the output .csv file|
+|cuda| Whether to utilize CUDA or not. `--cuda False` if you are using CPU|
 
 Usage:
 ```{shell}
 cd /path/to/Benisse
+source environment/bin/activate
 python3 AchillesEncoder.py \
 --input_data example/10x_NSCLC.csv \
 --output_data example/encoded_10x_NSCLC.csv
+--cuda True
+deactivate
 ```
 This script generates the numerical BCR embeddings, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
 

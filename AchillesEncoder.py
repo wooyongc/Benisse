@@ -22,6 +22,9 @@ from contrast_util import NCEAverage, NCESoftmaxLoss
 from data_pre import load_BCRdata2, datasetMap_nt
 from data_util import Dataset
 
+def strtobool(v):
+    return v.lower() in ("yes", "true", "t", "1")
+
 #Get parameters
 def parse_option():
     parser=argparse.ArgumentParser('Arguments for training')
@@ -36,6 +39,7 @@ def parse_option():
     parser.add_argument('--encode_dim',type=int,default=40,help='Columns of padded atchley matrix (default: 80)')
     parser.add_argument('--pad_length',type=int,default=130,help='Length of padded nucleotide sequence (default: 130), \
     	cells with nucleotide sequences longer than the length will be removed.')
+    parser.add_argument('--cuda', default=True, type=strtobool, help='Whether to use CUDA to train model')
     opt=parser.parse_args()
     return opt
 
@@ -66,7 +70,15 @@ test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
                                           shuffle=False, sampler=None,batch_sampler=None,num_workers=1)
 
 #Load model
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+if torch.cuda.is_available():
+    if opt.cuda:
+        device = torch.device("cuda")
+    if not opt.cuda:
+        print("Note: You have CUDA enabled but not using it.")
+        device = torch.device("cpu")
+else:
+    device = torch.device("cpu")
+
 feat_dim=20
 in_feature=130
 nce_k = 1
@@ -76,11 +88,15 @@ lr = 0.001
 momentum = 0.9
 weight_decay = 0.0001
 gradient_clip = 5
-state=torch.load(os.path.dirname(os.path.abspath(__file__))+"/dependency/trained_model.pt")
-test_model=MyAlexNetCMC(in_feature=in_feature,feat_dim=feat_dim,freeze=True).cuda()
-contrast = NCEAverage(n_out_features, n_data, nce_k, nce_t, nce_m).cuda()
-criterion_cdr = NCESoftmaxLoss().cuda()
-criterion_vdj = NCESoftmaxLoss().cuda()
+
+if opt.cuda:
+    state=torch.load(os.path.dirname(os.path.abspath(__file__))+"/dependency/trained_model.pt")
+else:
+    state = torch.load(os.path.dirname(os.path.abspath(__file__)) + "/dependency/trained_model.pt", map_location=torch.device('cpu'))
+test_model=MyAlexNetCMC(in_feature=in_feature,feat_dim=feat_dim,freeze=True).to(device)
+contrast = NCEAverage(n_out_features, n_data, nce_k, device, nce_t, nce_m).to(device)
+criterion_cdr = NCESoftmaxLoss().to(device)
+criterion_vdj = NCESoftmaxLoss().to(device)
 optimizer = torch.optim.SGD(test_model.parameters(),
                             lr=lr,
                             momentum=momentum,

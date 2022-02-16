@@ -1,6 +1,10 @@
 #Functions for the primary check
 library(ggplot2)
-library(igraph)
+if(!require(igraph)){
+  install.packages("igraph")
+  library(igraph)
+}
+
 #1. get latent t
 getLatentTdist=function(Q,m,gamma){
   tmp=solve(Q)
