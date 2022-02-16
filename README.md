@@ -1,7 +1,6 @@
 ![QBRC_logo](https://github.com/jcao89757/SCINA/blob/master/QBRC.jpg)
 # BENISSE
 ## Introduction
-
 [![DOI](https://zenodo.org/badge/429241506.svg)](https://zenodo.org/badge/latestdoi/429241506)
 
 Benisse (**B**CR **e**mbedding graphical **n**etwork **i**nformed by **s**cRNA-**S**eq) provides a powerful tool for analyzing B cell receptors (BCRs) guided by single cell gene expression of the B cells. As BCR affinity maturation is controlled by signals obtained by B cells through the BCRs with varying antigen binding strengths, B cells with similar BCR sequences are likely to have similar transcriptomic profiles. Our deep contrastive learning model numerically embeds BCR CDR3H amino acid sequences, and Benisse employs a sparse graph learning model to capture the mutual information shared between the BCRs and single B cell expression, based upon the BCR encoder.
