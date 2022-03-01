@@ -1,6 +1,7 @@
+[![DOI](https://zenodo.org/badge/429241506.svg)](https://zenodo.org/badge/latestdoi/429241506)
+
 ![QBRC_logo](https://github.com/jcao89757/SCINA/blob/master/QBRC.jpg)
 
-[![DOI](https://zenodo.org/badge/429241506.svg)](https://zenodo.org/badge/latestdoi/429241506)
 
 # BENISSE
 ## Introduction
