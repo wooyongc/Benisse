@@ -21,7 +21,7 @@ pytorch (version 1.10.0), pandas (version 1.3.4), sklearn (version 1.0), and num
 
 **R Packages**
 
-R UMAP (version 0.2.7.0), Rtsne (version 0.15), and igraph (version 1.2.7).
+R UMAP (version 0.2.7.0), Rtsne (version 0.15), ggplot2 (version 3.3.5), data.table (version 1.14.2), and igraph (version 1.2.7).
 
 ## Guided tutorial
 In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
