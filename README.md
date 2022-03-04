@@ -55,7 +55,7 @@ pip install pandas
 pip install sklearn
 pip install numpy
 
-# Deactivate the virtual environment
+# Deactivate the virtual environment when you are done with the analyses
 deactivate
 ```
 
@@ -113,7 +113,7 @@ python3 AchillesEncoder.py \
 --output_data example/encoded_10x_NSCLC.csv \
 --cuda True
 
-# Deactivate the virtual environment
+# Deactivate the virtual environment when you are done with the analyses
 deactivate
 ```
 This script generates the numerical BCR embeddings, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
