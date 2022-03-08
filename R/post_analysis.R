@@ -53,7 +53,7 @@ plotClusters=function(t,Q,SI,sparse_matrix,master_dist_e,name,path,
   data2plot=data.frame(PC1=pca[,1],
                        PC2=pca[,2],
                        clsize=clsize)
-  g=ggplot(data2plot)+theme_bw(base_size = 12)+guides(size=FALSE)+
+  g=ggplot(data2plot)+theme_bw(base_size = 12)+guides(size="none")+
     xlim(range(pca[,1]))+ylim(range(pca[,2]))+
     geom_point(color='forestgreen',alpha=0.7,aes(x=PC1,y=PC2,size=sqrt(clsize)))+
     ggtitle(paste(name,'cor_ab:',round(cor$c1,digit=3),'cor_ac',round(cor$c2,digit=3)))

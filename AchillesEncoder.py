@@ -22,8 +22,13 @@ from contrast_util import NCEAverage, NCESoftmaxLoss
 from data_pre import load_BCRdata2, datasetMap_nt
 from data_util import Dataset
 
-def strtobool(v):
-    return v.lower() in ("yes", "true", "t", "1")
+def strtobool(s):
+    if s.lower() == 'true':
+        return True
+    elif s.lower() == 'false':
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 #Get parameters
 def parse_option():

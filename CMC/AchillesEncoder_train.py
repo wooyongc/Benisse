@@ -28,8 +28,13 @@ from data_util import Dataset
 from random import seed,sample
 from sklearn.metrics import roc_curve,auc
 
-def strtobool(v):
-    return v.lower() in ("yes", "true", "t", "1")
+def strtobool(s):
+    if s.lower() == 'true':
+        return True
+    elif s.lower() == 'false':
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def parse_option():
     parser=argparse.ArgumentParser('Arguments for training')
