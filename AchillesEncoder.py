@@ -28,7 +28,7 @@ def strtobool(s):
     elif s.lower() == 'false':
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError('Please input True or False')
 
 #Get parameters
 def parse_option():
