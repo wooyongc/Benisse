@@ -1,6 +1,7 @@
+[![DOI](https://zenodo.org/badge/429241506.svg)](https://zenodo.org/badge/latestdoi/429241506)
+
 ![QBRC_logo](https://github.com/jcao89757/SCINA/blob/master/QBRC.jpg)
 
-[![DOI](https://zenodo.org/badge/429241506.svg)](https://zenodo.org/badge/latestdoi/429241506)
 
 # BENISSE
 ## Introduction
@@ -20,7 +21,7 @@ pytorch (version 1.10.0), pandas (version 1.3.4), sklearn (version 1.0), and num
 
 **R Packages**
 
-R UMAP (version 0.2.7.0), Rtsne (version 0.15), and igraph (version 1.2.7).
+ggplot2 (version 3.3.5), data.table (version 1.14.2), and igraph (version 1.2.7).
 
 ## Guided tutorial
 In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
@@ -28,17 +29,33 @@ In this tutorial, we will show a complete workflow for Benisse. The toy example 
 ### Installation
 We recommend that you set up a python virtual environment for the BCR encoder using the commands below.
 ```{shell}
-cd path/to/Benisse
+# Navigate to your directory of preference
+cd path/to/workdir
+
+# Clone the repository 
+git clone https://github.com/wooyongc/Benisse.git
+
+# Navigate to the Benisse directory
+cd Benisse
+
 # on our own servers. you may need to adapt these following three lines of codes to your system
 # module purge
 # module load shared
 # module load python/3.7.x-anaconda
+
+# Set up a virtual environment under the /environment folder
 python3 -m venv ./environment
+
+# Activate the virtual environment
 source environment/bin/activate
+
+# Install dependencies
 pip install torch
 pip install pandas
 pip install sklearn
 pip install numpy
+
+# Deactivate the virtual environment when you are done with the analyses
 deactivate
 ```
 
@@ -84,12 +101,19 @@ The numerical BCR embedding script takes the following as input parameters:
 
 Usage:
 ```{shell}
+# Navigate to the path you installed Benisse
 cd /path/to/Benisse
+
+# Activate the virtual environment
 source environment/bin/activate
+
+# Run the Encoder
 python3 AchillesEncoder.py \
 --input_data example/10x_NSCLC.csv \
 --output_data example/encoded_10x_NSCLC.csv \
 --cuda True
+
+# Deactivate the virtual environment when you are done with the analyses
 deactivate
 ```
 This script generates the numerical BCR embeddings, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
@@ -118,7 +142,10 @@ Using the generated BCR embedding, we can now run the R script, which is a spars
 The following example code runs the core Benisse model. We recommend using the hyperparameters in the following example to start with. For detailed explanation of the hyperparameters, please refer to Supplementary Note 1. of our paper.
 
 ```{r}
+# Navigate to the path you installed Benisse
 cd path/to/Benisse
+
+# Run the core Benisse model
 Rscript Benisse.R \
 example/10x_NSCLC_exp.csv \
 example/10x_NSCLC_contigs.csv \
