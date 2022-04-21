@@ -94,6 +94,8 @@ momentum = 0.9
 weight_decay = 0.0001
 gradient_clip = 5
 
+print("Loading trained model...")
+
 if opt.cuda:
     state=torch.load(os.path.dirname(os.path.abspath(__file__))+"/dependency/trained_model.pt")
 else:
@@ -130,7 +132,9 @@ def embed(test_loader, model):
 
     return feature_array
 
+print("Embedding BCR sequences...")
 encoded_BCR=embed(test_loader,test_model)
 encoded_BCR.to_csv(opt.output_data,sep=',')
+print("BCR successfully encoded. The output file is generated here: ", opt.output_data)
 
 # Ze, we keep you in our heart forever

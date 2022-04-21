@@ -128,9 +128,6 @@ def datasetMap_nt(dataset,aa_dict,encode_dim,pad_length=130):
     nt_dict=dict()
     cdr3_seq_dict=dict()
     for i in range(0,len(dataset['cdr3'])):
-        if i % 10000 == 0:
-            print('Converting row:')
-            print(i)
         BCR_key=dataset['contigs'][i]
         if BCR_key in BCR_dict.keys():
             BCR_key=BCR_key+'__'+str(i)
