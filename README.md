@@ -8,7 +8,7 @@
 
 Benisse (**B**CR **e**mbedding graphical **n**etwork **i**nformed by **s**cRNA-**S**eq) provides a powerful tool for analyzing B cell receptors (BCRs) guided by single cell gene expression of the B cells. As BCR affinity maturation is controlled by signals obtained by B cells through the BCRs with varying antigen binding strengths, B cells with similar BCR sequences are likely to have similar transcriptomic profiles. Our deep contrastive learning model numerically embeds BCR CDR3H amino acid sequences, and Benisse employs a sparse graph learning model to capture the mutual information shared between the BCRs and single B cell expression, based upon the BCR encoder.
 
-Please refer to our paper for more details: TBA
+Please refer to our paper for more details : [Interpreting the B-cell receptor repertoire with single-cell gene expression using Benisse](https://www.nature.com/articles/s42256-022-00492-6)
 
 Researchers searching for more immunology-related bioinformatics tools can visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
 
