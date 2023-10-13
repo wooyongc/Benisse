@@ -72,9 +72,6 @@ Installation time will be about 30min, depending on the computing system
 
 **Fig.1 |** An example input of a BCR heavy chain sequence file
 
-
-2. Single B cell expression matrix in .csv format. Easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_exp.csv).
-
 <img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC_exp.png" width="700">
 
 **Fig.2 |** An example of B cell expression matrix
