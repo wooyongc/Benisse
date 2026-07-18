@@ -153,7 +153,8 @@ def test_barcode_reversibility_guard():
     with pytest.raises(ValueError):
         aa.assert_reversible_barcodes(["already.dotted-1"])
     with pytest.raises(ValueError):
-        # "a.1" and "a-1" both normalise to "a.1" -> not injective.
+        # "a.1" already contains '.', so the dot-guard rejects the batch (this is
+        # what makes '-'<->'.' non-invertible), before any injectivity check.
         aa.assert_reversible_barcodes(["a-1", "a.1"])
 
 
@@ -272,3 +273,112 @@ def test_attach_and_read_network_result_uses_uns_not_obsp():
     assert read.node_ids == res.node_ids
     assert np.array_equal(read.row, res.row)
     assert read.params == res.params
+
+
+# --- audit regression tests ----------------------------------------------
+
+
+def test_string_valued_productive_is_parsed_not_truthy_cast():
+    # AIRR TSV encodes booleans as "T"/"F"; bool("F") is True, so a naive cast
+    # would keep the non-productive chain. The "F" chain must be dropped.
+    cells = [("s-1", [
+        _chain("IGH", "CARBIG", "s_np", productive="F", dup=99, cons=99),
+        _chain("IGH", "CARSMALL", "s_ok", productive="T", dup=1, cons=1),
+    ])]
+    heavy = aa.select_heavy_chains(_airr_anndata(cells))
+    assert heavy.loc["s-1", "sequence_id"] == "s_ok"
+
+
+def test_count_coalesces_when_preferred_column_is_null():
+    # duplicate_count present but null for every row -> fall back to
+    # consensus_count, which then dominates the ranking over junction_aa.
+    cells = [("q-1", [
+        _chain("IGH", "CARQA", "q1", dup=None, cons=5),
+        _chain("IGH", "CARQB", "q2", dup=None, cons=50),
+    ])]
+    heavy = aa.select_heavy_chains(_airr_anndata(cells))
+    assert heavy.loc["q-1", "sequence_id"] == "q2"  # cons 50 > 5 beats CARQA<CARQB
+    assert heavy.loc["q-1", "selection_count"] == 50.0
+
+
+def test_missing_required_field_raises_clear_error():
+    airr = ak.Array([[{"locus": "IGH", "productive": True, "junction_aa": "CARX"}]])
+    adata = anndata.AnnData(np.zeros((1, 0), dtype="float32"))
+    adata.obs_names = ["m-1"]
+    adata.obsm["airr"] = airr
+    with pytest.raises(ValueError, match="sequence_id"):
+        aa.select_heavy_chains(adata)
+
+
+def test_selection_deterministic_with_duplicate_sequence_id():
+    # Non-conformant input (duplicate sequence_id, identical sort keys): the
+    # storage-position tiebreak keeps the result deterministic for a given
+    # object (picks chain_pos 0), though not order-independent.
+    cells = [("d-1", [
+        _chain("IGH", "CARSAME", "dupsid", dup=5, cons=5, c="IGHM"),
+        _chain("IGH", "CARSAME", "dupsid", dup=5, cons=5, c="IGHG"),
+    ])]
+    obj = _airr_anndata(cells)
+    first = aa.select_heavy_chains(obj)
+    second = aa.select_heavy_chains(_airr_anndata(cells))
+    assert len(first) == 1
+    assert first.loc["d-1", "c_call"] == "IGHM"  # chain_pos 0
+    pd.testing.assert_frame_equal(first, second)
+
+
+def test_attach_embedding_rejects_barcode_namespace_mismatch():
+    adata = _airr_anndata(_CELLS)
+    # R-dotted barcodes match no obs_name -> must raise, not silently all-NaN.
+    emb = pd.DataFrame(np.ones((1, 3)), index=["cell_A.1"])
+    with pytest.raises(ValueError, match="namespace"):
+        aa.attach_embedding(adata, emb)
+    assert "X_benisse" not in adata.obsm
+
+
+def test_attach_embedding_warns_on_partial_coverage():
+    adata = _airr_anndata(_CELLS)
+    emb = pd.DataFrame(np.ones((2, 3)), index=["cell_A-1", "ghost-1"])
+    with pytest.warns(UserWarning, match="did not match"):
+        aa.attach_embedding(adata, emb)
+    assert adata.obsm["X_benisse"].shape == (adata.n_obs, 3)
+
+
+def test_attach_embedding_refuses_reserved_keys():
+    adata = _airr_anndata(_CELLS)
+    emb = pd.DataFrame(np.ones((1, 3)), index=["cell_A-1"])
+    for reserved in ("airr", "chain_indices"):
+        with pytest.raises(ValueError, match="reserved"):
+            aa.attach_embedding(adata, emb, key=reserved)
+
+
+def test_validate_rejects_nan_weight_and_float_indices():
+    nan_w = aa.BenisseNetworkResult(
+        node_ids=["a", "b"], row=np.array([0]), col=np.array([1]),
+        weight=np.array([np.nan]),
+    )
+    with pytest.raises(ValueError, match="NaN or infinite"):
+        aa.validate_network_result(nan_w)
+
+    float_idx = aa.BenisseNetworkResult(
+        node_ids=["a", "b"], row=np.array([0.0]), col=np.array([1.0]),
+        weight=np.array([1.0]),
+    )
+    with pytest.raises(ValueError, match="integer dtype"):
+        aa.validate_network_result(float_idx)
+
+
+def test_validate_enforces_undirected_upper_triangle():
+    lower = aa.BenisseNetworkResult(
+        node_ids=["a", "b"], row=np.array([1]), col=np.array([0]),
+        weight=np.array([1.0]),
+    )
+    with pytest.raises(ValueError, match="upper-triangular"):
+        aa.validate_network_result(lower)
+
+    # Same edge is fine once marked directed, and round-trips through to_dict.
+    directed = aa.BenisseNetworkResult(
+        node_ids=["a", "b"], row=np.array([1]), col=np.array([0]),
+        weight=np.array([1.0]), directed=True,
+    )
+    aa.validate_network_result(directed)
+    assert aa.BenisseNetworkResult.from_dict(directed.to_dict()).directed is True

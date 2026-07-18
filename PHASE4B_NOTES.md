@@ -62,11 +62,18 @@ chain order (tested). Abundance count coalesces `umi_count` -> `duplicate_count`
 5. **Barcode reversibility precondition.** `-`<->`.` normalisation is only
    reversible when barcodes contain no `.`. True for AP4; `assert_reversible_barcodes`
    guards it. A dataset with dotted barcodes needs a different join key.
-6. **Result-schema node identity.** `BenisseNetworkResult.node_ids` are the
-   encoder `contigs` (one per selected heavy chain). When the R core actually
-   produces `sparse_graph.txt` (Phase 4c/4d), confirm its node ordering maps 1:1
-   to this node index before populating `edges`. The schema is defined and
-   validated but not yet wired to real R output.
+6. **Result-schema node identity — nodes are clones, NOT cells/contigs.**
+   Corrected after audit. `Benisse.R:64-73` keys clones by `v_gene_cdr3_j_gene`,
+   deduplicates (`!duplicated(cdr3exp)`), and `R/initiation.R` sorts them and can
+   drop clones below `rm_cutoff`. So `sparse_graph.txt` (`results$A`) is indexed
+   by sorted, deduplicated, filterable **clone keys**, not per-cell contigs — the
+   two are 1:1 only when there is no clonal expansion and no cutoff (which happens
+   to hold for AP4: 203 cells → 203 distinct clones). The Phase 4c bridge must
+   therefore take `node_ids` and their order from the R side
+   (`clone_annotation.csv` / `meta_dedup`), not from `select_heavy_chains`. The
+   `BenisseNetworkResult` schema (`node_ids: list[str]`) holds clone keys without
+   change; its docstring now documents this, and the graph is marked undirected
+   (upper-triangular edges) so a symmetric `A` is not double-counted.
 7. **Embedding obsm alignment.** `attach_embedding` writes a cell-aligned matrix
    into the `airr` modality with NaN rows for cells lacking a heavy chain. If the
    canonical API instead stores a chain-level (not cell-level) object, the

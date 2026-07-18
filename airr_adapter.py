@@ -28,6 +28,7 @@ raw ``obsm['airr']`` awkward array so it can be unit-tested cheaply.
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -135,6 +136,10 @@ def airr_to_dataframe(obj: Any, modality: str = "airr") -> pd.DataFrame:
     every field in :data:`_CHAIN_FIELDS` that the object actually carries. The
     result is deterministic: cell order follows ``obs_names`` and chain order
     follows storage order within each cell.
+
+    Only the known fields are surfaced here; custom/AIRR-extension fields are not
+    flattened, but they are not lost -- the source object is never mutated, so
+    they remain available in ``obsm['airr']`` for export.
     """
     airr = _airr_array(obj, modality)
     cell_ids = _obs_names(obj, modality)
@@ -170,6 +175,27 @@ def _count_series(frame: pd.DataFrame) -> pd.Series:
     return result.fillna(0.0)
 
 
+#: Values counted as AIRR ``productive`` true. AIRR TSV encodes booleans as
+#: ``T``/``F`` strings, so a plain ``bool()`` cast is wrong (``bool("F")`` is
+#: True); match explicitly instead (airr_context.md: "parse booleans, not string
+#: equality").
+_TRUTHY = {True, 1, "T", "TRUE", "True", "true", "t"}
+
+
+def _parse_productive(series: pd.Series) -> pd.Series:
+    """Boolean mask of truthy AIRR ``productive`` values (null -> False)."""
+    return series.map(lambda v: v in _TRUTHY).astype(bool)
+
+
+def _require_chain_fields(frame: pd.DataFrame, fields: Sequence[str]) -> None:
+    missing = [f for f in fields if f not in frame.columns]
+    if missing:
+        raise ValueError(
+            f"AIRR object is missing required chain field(s) {missing}; "
+            f"available fields: {sorted(frame.columns)}."
+        )
+
+
 def select_heavy_chains(
     obj: Any,
     modality: str = "airr",
@@ -179,11 +205,14 @@ def select_heavy_chains(
     """Pick exactly one heavy chain per cell, deterministically.
 
     A candidate chain must have ``locus`` in *heavy_loci*, a non-empty
-    ``junction_aa``, and (when *require_productive*) ``productive`` truthy.
+    ``junction_aa``, and (when *require_productive*) a truthy ``productive``.
     Candidates are ranked per cell by descending abundance count, then ascending
-    ``junction_aa``, then ascending ``sequence_id`` -- a total order, so the
-    winner never depends on input row order. Cells with no candidate are
-    dropped.
+    ``junction_aa``, then ascending ``sequence_id``, then storage position. Given
+    AIRR's guarantee that ``sequence_id`` is unique, this is a total order on
+    chain content, so the winner is independent of storage order; the final
+    position key only breaks ties between otherwise-identical records (which
+    AIRR should not produce) and keeps the result deterministic for a given
+    object. Cells with no candidate are dropped.
 
     Returns a DataFrame indexed by ``cell_id`` (unique) with the selected
     chain's fields plus a ``selection_count`` column recording the abundance
@@ -193,11 +222,16 @@ def select_heavy_chains(
     if chains.empty:
         return chains.set_index("cell_id") if "cell_id" in chains else chains
 
+    required = ["locus", "junction_aa", "sequence_id"]
+    if require_productive:
+        required.append("productive")
+    _require_chain_fields(chains, required)
+
     cand = chains[chains["locus"].isin(list(heavy_loci))].copy()
     ja = cand["junction_aa"].astype("string")
     cand = cand[ja.notna() & (ja.str.len() > 0)]
     if require_productive:
-        cand = cand[cand["productive"].fillna(False).astype(bool)]
+        cand = cand[_parse_productive(cand["productive"])]
 
     if cand.empty:
         return pd.DataFrame(columns=chains.columns.drop("cell_id")).rename_axis("cell_id")
@@ -210,8 +244,8 @@ def select_heavy_chains(
     cand["_sid"] = cand["sequence_id"].astype(str)
 
     cand = cand.sort_values(
-        by=["_cell_order", "selection_count", "_ja", "_sid"],
-        ascending=[True, False, True, True],
+        by=["_cell_order", "selection_count", "_ja", "_sid", "chain_pos"],
+        ascending=[True, False, True, True, True],
         kind="mergesort",
     )
     winners = cand.drop_duplicates("cell_id", keep="first")
@@ -326,9 +360,16 @@ def attach_embedding(
     *embedding* is indexed by cell_id with one column per latent dimension. Rows
     are aligned to the modality's ``obs_names``; cells absent from *embedding*
     (e.g. no heavy chain) get an all-NaN row so the array stays cell-aligned.
-    The existing ``obsm['airr']`` and ``obsm['chain_indices']`` are asserted to
-    be untouched. Mutates and returns *obj*.
+
+    Coverage is checked so a barcode-namespace mismatch does not pass silently:
+    if *no* embedding row matches an ``obs_name`` (the classic ``-``/``.``
+    normalisation bug) a ``ValueError`` is raised; a partial mismatch warns. The
+    reserved keys ``airr``/``chain_indices`` cannot be overwritten. Mutates and
+    returns *obj*.
     """
+    if key in ("airr", "chain_indices"):
+        raise ValueError(f"Refusing to overwrite reserved AIRR obsm key {key!r}.")
+
     mod = getattr(obj, "mod", None)
     adata = mod[modality] if isinstance(mod, Mapping) and modality in mod else obj
     cell_ids = list(map(str, adata.obs_names))
@@ -336,12 +377,26 @@ def attach_embedding(
     before_fields = list(adata.obsm["airr"].fields)
     before_len = len(adata.obsm["airr"])
 
+    matched = embedding.index.isin(cell_ids)
+    if len(embedding) and not matched.any():
+        raise ValueError(
+            "No embedding row matched obs_names; check the barcode namespace "
+            "(e.g. R-style '.' vs canonical '-'). Nothing was written."
+        )
+    if not matched.all():
+        warnings.warn(
+            f"{(~matched).sum()} of {len(embedding)} embedding rows did not match "
+            "any obs_name and were dropped.",
+            stacklevel=2,
+        )
+
     aligned = embedding.reindex(cell_ids)
     matrix = aligned.to_numpy(dtype="float64")
     if matrix.shape[0] != len(cell_ids):
         raise AssertionError("Embedding row count does not match obs_names.")
     adata.obsm[key] = matrix
 
+    # obsm['airr'] is never written here; these guards catch accidental aliasing.
     assert list(adata.obsm["airr"].fields) == before_fields, "AIRR fields mutated"
     assert len(adata.obsm["airr"]) == before_len, "AIRR row count mutated"
     if "chain_indices" in adata.obsm:
@@ -361,8 +416,19 @@ class BenisseNetworkResult:
     cell-aligned ``obsp`` slot (airr_context.md). Edges are an explicit COO
     triple (``row``, ``col``, ``weight``) indexing into ``node_ids``.
 
-    ``node_ids`` are the encoder ``contigs`` used as graph nodes (one per
-    selected heavy chain). ``params`` and ``provenance`` carry the R/model
+    ``node_ids`` are Benisse's graph nodes, which are **deduplicated clones**,
+    not cells or contigs: ``Benisse.R`` keys clones by ``v_gene _ cdr3 _ j_gene``,
+    deduplicates, sorts them, and may drop clones below ``rm_cutoff`` before
+    building ``results$A`` (``Benisse.R:64-73``, ``R/initiation.R``). So a
+    consumer (the Phase 4c bridge) must take ``node_ids`` and their order from
+    the R side (``clone_annotation.csv`` / ``meta_dedup``), NOT from the
+    per-cell selection -- the two are 1:1 only when there is no clonal expansion
+    and no cutoff (as happens to hold for the AP4 fixture).
+
+    Benisse's graph is undirected. With ``directed=False`` (default), edges must
+    be stored in canonical upper-triangle form (``row <= col``) so a symmetric
+    R ``A`` is not double-counted; the 4c bridge upper-triangularises before
+    constructing a result. ``params`` and ``provenance`` carry the R/model
     parameters, input hashes, and schema identity needed to reproduce the run.
     """
 
@@ -372,6 +438,7 @@ class BenisseNetworkResult:
     weight: np.ndarray
     params: dict[str, Any] = field(default_factory=dict)
     provenance: dict[str, Any] = field(default_factory=dict)
+    directed: bool = False
     schema_version: str = SCHEMA_VERSION
 
     @property
@@ -396,6 +463,7 @@ class BenisseNetworkResult:
         return {
             "schema_version": self.schema_version,
             "node_ids": list(self.node_ids),
+            "directed": bool(self.directed),
             "edges": {
                 "row": np.asarray(self.row, dtype="int64"),
                 "col": np.asarray(self.col, dtype="int64"),
@@ -415,6 +483,7 @@ class BenisseNetworkResult:
             weight=np.asarray(edges["weight"], dtype="float64"),
             params=dict(data.get("params", {})),
             provenance=dict(data.get("provenance", {})),
+            directed=bool(data.get("directed", False)),
             schema_version=data.get("schema_version", SCHEMA_VERSION),
         )
 
@@ -427,11 +496,27 @@ def validate_network_result(result: BenisseNetworkResult) -> None:
     lengths = {len(result.row), len(result.col), len(result.weight)}
     if len(lengths) != 1:
         raise ValueError("row, col, and weight must have equal length.")
+
+    row = np.asarray(result.row)
+    col = np.asarray(result.col)
+    weight = np.asarray(result.weight)
     if result.n_edges:
-        for name, arr in (("row", result.row), ("col", result.col)):
-            arr = np.asarray(arr)
+        for name, arr in (("row", row), ("col", col)):
+            if arr.dtype.kind not in ("i", "u"):
+                raise ValueError(
+                    f"{name} must have an integer dtype (got {arr.dtype}); "
+                    "float indices would be truncated by to_coo()."
+                )
             if arr.min() < 0 or arr.max() >= n:
                 raise ValueError(f"{name} index out of range for {n} nodes.")
+        if not np.isfinite(weight).all():
+            raise ValueError("weight contains NaN or infinite values.")
+        if not result.directed and np.any(row > col):
+            raise ValueError(
+                "undirected result must be stored upper-triangular (row <= col); "
+                "symmetrise the adjacency before constructing the result, or set "
+                "directed=True."
+            )
     if result.schema_version != SCHEMA_VERSION:
         raise ValueError(
             f"Unexpected schema_version {result.schema_version!r}; "
