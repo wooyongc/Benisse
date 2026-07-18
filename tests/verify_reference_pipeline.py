@@ -21,9 +21,14 @@ STABLE_R_OUTPUTS = (
 PDF_OUTPUTS = ("connectionplot.pdf", "in_cross_dist_check.pdf")
 
 
-def run(command):
+def run(command, timeout=1800):
     print("+", " ".join(map(str, command)), flush=True)
-    subprocess.run([str(part) for part in command], cwd=REPO_ROOT, check=True)
+    subprocess.run(
+        [str(part) for part in command],
+        cwd=REPO_ROOT,
+        check=True,
+        timeout=timeout,
+    )
 
 
 def require_executable(name):

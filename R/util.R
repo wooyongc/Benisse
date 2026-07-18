@@ -1,4 +1,10 @@
 library(data.table)
+
+graphChangeMSE=function(current_graph,previous_graph)
+{
+  sum((current_graph-previous_graph)^2)/nrow(current_graph)^2
+}
+
 Benisse=function(hyper_para,cdr3exp,t,meta_dedup,exp_data,max_iter,
                  save_path,mode,stop_cutoff,simu_initiation=NA,sample=NA,rm_cutoff=NA)
 {
@@ -38,7 +44,7 @@ Benisse=function(hyper_para,cdr3exp,t,meta_dedup,exp_data,max_iter,
       # Mean squared per-entry graph change over each of the last 10 updates.
       # Parenthesize the elementwise delta before squaring so positive and
       # negative edge changes cannot cancel before the norm is calculated.
-      res_vec=sapply(1:10,function(r) sum((res[[r]]-res_back[[r]])^2)/nrow(sparse_graph)^2)
+      res_vec=sapply(1:10,function(r) graphChangeMSE(res[[r]],res_back[[r]]))
       if(mean(res_vec)<stop_cutoff&sd(res_vec)<1e-4){
         print(mean(res_vec))
         print(paste('Convergence: iteration',i))
