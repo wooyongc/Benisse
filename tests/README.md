@@ -11,8 +11,16 @@ conda run -n benisse-scirpy022 python -m pytest -v
 
 The fast suite checks the callable encoder contract, duplicate and disjoint multi-file input,
 input-order invariance, every committed reference hash, the corrected convergence norm, and
-scientific invariants of the R oracle. It runs entirely on CPU; the full pipeline test is
-skipped unless explicitly enabled.
+scientific invariants of the R oracle. Phase 4d also compares each NumPy/SciPy numerical
+kernel with an R-generated golden fixture, including the `n > 1000` L-BFGS-B branch. It runs
+entirely on CPU; the full pipeline test is skipped unless explicitly enabled.
+
+Regenerate and inspect the Phase 4d component oracle with:
+
+```sh
+Rscript tests/fixtures/generate_r_core_golden.R tests/fixtures/r_core_golden.json
+conda run -n benisse-scirpy022 python -m pytest tests/test_python_r_core.py -v
+```
 
 Run the complete Python + R oracle check explicitly:
 

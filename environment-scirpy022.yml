@@ -8,6 +8,8 @@ dependencies:
   # Torch 2.2.2 predates NumPy 2 and is the last release with Intel-macOS
   # wheels, so keep the encoder on the project's proven NumPy 1.x version.
   - numpy=1.26.4
+  # Phase 4d translates R's bounded L-BFGS-B graph update to scipy.optimize.
+  - scipy=1.15.3
   # Pin the last readily available Intel-macOS wheel pair. Without these pins,
   # pip selects Numba 0.66 and attempts an unsupported local OpenMP/LLVM build.
   - numba=0.61.2
