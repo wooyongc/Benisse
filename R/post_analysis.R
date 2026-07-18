@@ -57,11 +57,11 @@ plotClusters=function(t,Q,SI,sparse_matrix,master_dist_e,name,path,
     xlim(range(pca[,1]))+ylim(range(pca[,2]))+
     geom_point(color='forestgreen',alpha=0.7,aes(x=PC1,y=PC2,size=sqrt(clsize)))+
     ggtitle(paste(name,'cor_ab:',round(cor$c1,digit=3),'cor_ac',round(cor$c2,digit=3)))
-  tmp=graph.adjacency(sparse_matrix)
-  tmp=get.edgelist(tmp)
+  tmp=graph_from_adjacency_matrix(sparse_matrix)
+  tmp=as_edgelist(tmp)
   data_tmp=data.frame(PC1=pca[tmp[,1],1],PC2=pca[tmp[,1],2],PC1_end=pca[tmp[,2],1],PC2_end=pca[tmp[,2],2])
   g=g+geom_segment(data=data_tmp,color='grey80', alpha=0.5,
-                  aes(x=PC1,y=PC2,xend=PC1_end,yend=PC2_end),size=0.1)
+                  aes(x=PC1,y=PC2,xend=PC1_end,yend=PC2_end),linewidth=0.1)
   if(!is.na(unlist(hyper_para[1]))){
     g=g+labs(subtitle=paste('lambda1:',hyper_para[[1]],'lambda2:',hyper_para[[2]],'\n gamma:',hyper_para[[3]],
                       'rho',hyper_para[[4]],'\n Edges remained ratio:',reEdge))
@@ -78,7 +78,7 @@ convertCluster=function(sparse_graph){
   for (i in 1:dim(sparse_graph)[1]){
     for (j in i:dim(sparse_graph)[1]){
       if (i==j) {next}
-      if (results$sparse_graph[i,j]==1){
+      if (sparse_graph[i,j]==1){
         if (clusters[i]==""){
           id=id+1
           clusters[i]=paste("cluster",id)

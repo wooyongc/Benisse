@@ -22,7 +22,8 @@
 # 11th parameter: stop_cutoff
 
 ######  read arguments and set up environment  #########
-
+library(igraph)
+library(data.table)
 args=commandArgs(trailingOnly = FALSE)
 scriptPath=normalizePath(dirname(sub("^--file=", "", args[grep("^--file=", args)])))
 
@@ -45,6 +46,8 @@ contigs=read.csv(input_bcr_data,stringsAsFactors = F)
 exp_data=read.csv(input_exp_data,stringsAsFactors = F)
 row.names(exp_data)=exp_data[,1]
 contigs_encoded=read.csv(input_encoded_data,stringsAsFactors = F)[,-1]
+contigs <- contigs[contigs$cdr3 %in% contigs_encoded$index,]
+
   
 tmp=preproBCR(contigs,exp_data)
 exp_data=tmp$exp_data
@@ -66,6 +69,7 @@ row.names(contigs_encoded)=contigs_refined$barcode
 colnames(contigs_encoded)[21]='cdr3'
 
 t=contigs_encoded[!duplicated(cdr3exp),1:20]
+
 meta_dedup=contigs_refined[!duplicated(cdr3exp),c('v_gene','j_gene','cdr3')]
 
 ########  other parameters  #############

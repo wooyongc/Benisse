@@ -13,50 +13,42 @@ Please refer to our paper for more details : [Interpreting the B-cell receptor r
 Researchers searching for more immunology-related bioinformatics tools can visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
 
 ### Dependencies
-Python (version 3.7), R (version 4.0.2)
+Python (version 3.10), R (version 4.3)
 
 **Python Packages**
 
-pytorch (version 1.10.0), pandas (version 1.3.4), sklearn (version 1.0), and numpy (version 1.21.3)
+pytorch (version 2.2.2, CPU build), pandas (version 1.5.3), scikit-learn, and numpy (version 1.26.4)
 
 **R Packages**
 
-ggplot2 (version 3.3.5), data.table (version 1.14.2), and igraph (version 1.2.7).
+ggplot2 (version 3.5.1; requires >= 3.4.0), data.table (version 1.16.0), and igraph (version 2.1.4; requires >= 2.0.0).
 
 ## Guided tutorial
 In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
 
 ### Installation
-We recommend that you set up a python virtual environment for the BCR encoder using the commands below.
+We recommend a conda environment for the BCR encoder using the commands below.
 ```{shell}
 # Navigate to your directory of preference
 cd path/to/workdir
 
-# Clone the repository 
+# Clone the repository
 git clone https://github.com/wooyongc/Benisse.git
 
 # Navigate to the Benisse directory
 cd Benisse
 
-# on our own servers. you may need to adapt these following three lines of codes to your system
-# module purge
-# module load shared
-# module load python/3.7.x-anaconda
+# Create and activate a conda environment (Python 3.10)
+conda create -n benisse python=3.10 -y
+conda activate benisse
 
-# Set up a virtual environment under the /environment folder
-python3 -m venv ./environment
+# Install dependencies.
+# Note: install `scikit-learn`, not the deprecated `sklearn` stub on PyPI.
+# torch 2.2.2 is the last version with Intel-macOS (x86_64) CPU wheels.
+pip install "torch==2.2.2" "pandas==1.5.3" "numpy==1.26.4" scikit-learn
 
-# Activate the virtual environment
-source environment/bin/activate
-
-# Install dependencies
-pip install torch
-pip install pandas
-pip install sklearn
-pip install numpy
-
-# Deactivate the virtual environment when you are done with the analyses
-deactivate
+# Deactivate the environment when you are done with the analyses
+conda deactivate
 ```
 
 Installation time will be about 30min, depending on the computing system
@@ -64,9 +56,9 @@ Installation time will be about 30min, depending on the computing system
 ### Input data
 1. BCR contig and heavy chain sequences in .csv format. Used by the BCR encoder. To be created by the user from the 10X contig file (input file 2 below). The .csv should contain at least two columns in the names of "contigs" (unique identifiers of cells) and "cdr3" (BCR CDR3H sequences), or a folder path which contains all and only the BCR sequence data files. Output will be concatenated into one output file.  Example: [10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC.csv)
 
-2. BCR contig file in .csv format. Easily adaptable from 10X software’s output. Used by the core Benisse model. Example: [10x_NSCLC_contigs.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig.csv)
+2. BCR contig file in .csv format. Easily adaptable from 10X software’s output. Used by the core Benisse model. Example: [10x_NSCLC_contigs.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contigs.csv)
 
-3. Single B cell expression matrix in csv format. Used by the core Benisse model. See **suggested pre-processing workflow** for pre-processing. Also easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_contig_exp.csv).
+3. Single B cell expression matrix in csv format. Used by the core Benisse model. See **suggested pre-processing workflow** for pre-processing. Also easily adaptable from 10X software's output. Example: [10x_NSCLC_exp.csv](https://github.com/wooyongc/Benisse/blob/main/example/10x_NSCLC_exp.csv).
 
 <img src="https://github.com/wooyongc/Benisse/blob/main/figs/10x_NSCLC.png" width="700">
 
@@ -101,17 +93,17 @@ Usage:
 # Navigate to the path you installed Benisse
 cd /path/to/Benisse
 
-# Activate the virtual environment
-source environment/bin/activate
+# Activate the conda environment
+conda activate benisse
 
-# Run the Encoder
+# Run the Encoder (use --cuda False on machines without a CUDA GPU)
 python3 AchillesEncoder.py \
 --input_data example/10x_NSCLC.csv \
 --output_data example/encoded_10x_NSCLC.csv \
---cuda True
+--cuda False
 
-# Deactivate the virtual environment when you are done with the analyses
-deactivate
+# Deactivate the environment when you are done with the analyses
+conda deactivate
 ```
 This script generates the numerical BCR embeddings, which is used as an input in step 2. After the script finishes running, the embedded BCR sequence in .csv format will be generated using the **output** parameter. Example: [encoded_10x_NSCLC.csv](https://github.com/wooyongc/Benisse/blob/main/example/encoded_10x_NSCLC.csv)
 

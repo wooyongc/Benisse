@@ -1,0 +1,14 @@
+# OS / editor cruft
+.DS_Store
+.Rhistory
+.idea/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Claude Code local config / worktrees
+.claude/
+
+# Graphify knowledge-graph output (regenerable via `graphify update .`)
+graphify-out/
