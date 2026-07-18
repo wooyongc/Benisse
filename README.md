@@ -24,7 +24,7 @@ pytorch (version 2.2.2, CPU build), pandas (version 1.5.3), scikit-learn, and nu
 ggplot2 (version 3.5.1; requires >= 3.4.0), data.table (version 1.16.0), and igraph (version 2.1.4; requires >= 2.0.0).
 
 ## Guided tutorial
-In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://figshare.com/account/projects/126659/articles/17035931).
+In this tutorial, we will show a complete workflow for Benisse. The toy example data we used in this tutorial are available on [github](https://github.com/wooyongc/Benisse/tree/main/example) and on [figshare](https://doi.org/10.6084/m9.figshare.17035931).
 
 ### Installation
 We recommend a conda environment for the BCR encoder using the commands below.
