@@ -58,9 +58,21 @@ def embed(test_loader, model, device):
 
     return feature_array
 
-if __name__ == '__main__':
+def encode_bcr(input_data, output_data, encode_dim=40, pad_length=130, cuda=True):
+    """Encode BCR CDR3 sequences with the frozen Benisse reference model.
+
+    This is the internal callable boundary used by parity tests and future data
+    adapters. The legacy command-line interface delegates here unchanged.
+    """
+    opt = argparse.Namespace(
+        input_data=str(input_data),
+        output_data=str(output_data),
+        encode_dim=encode_dim,
+        pad_length=pad_length,
+        cuda=cuda,
+    )
+
     #Load data
-    opt = parse_option()
     test = load_BCRdata2(opt)
 
     #Data prep
@@ -135,5 +147,21 @@ if __name__ == '__main__':
     encoded_BCR = embed(test_loader, test_model, device)
     encoded_BCR.to_csv(opt.output_data, sep=',')
     print("BCR successfully encoded. The output file is generated here: ", opt.output_data)
+    return encoded_BCR
+
+
+def main():
+    opt = parse_option()
+    encode_bcr(
+        input_data=opt.input_data,
+        output_data=opt.output_data,
+        encode_dim=opt.encode_dim,
+        pad_length=opt.pad_length,
+        cuda=opt.cuda,
+    )
+
+
+if __name__ == '__main__':
+    main()
 
 # Ze, we keep you in our heart forever

@@ -6,6 +6,7 @@
 # Python bytecode cache
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Claude Code local config / worktrees
 .claude/
