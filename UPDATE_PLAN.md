@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 1 complete on `fix/convergence-reproducibility`
+Status: LIVING PLAN — Phase 1 complete; data-release cleanup is next
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -39,17 +39,25 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | pandas 2 compatibility | **DONE** | Single- and multi-file encodes pass under pandas 2.3.3 with identical encoder SHA-256. |
 | AIRR/scirpy research fixture | **DONE** | `data/manifest.yaml`, ignored 5k `.h5mu`, deterministic AP4 203-cell fixture, and `environment-scirpy022.yml`. |
 | AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
-| Large-file/history cleanup | **PENDING** | Requires a release/figshare destination and explicit history-rewrite/Zenodo decision. |
-| In-house cohort governance | **BLOCKED** | Confirm consent/retention and history-scrub policy before touching the committed human-subject data. |
-| Phase 4a Python packaging/CLI | **PENDING — NEXT** | Start from `develop/v2-modernization` on a new feature branch. |
+| Large-file/history cleanup | **PENDING — NEXT** | Publish migrated assets to both Figshare and a GitHub Release, then rewrite history with the Zenodo/DOI implications documented. |
+| In-house cohort governance | **PENDING; decision made** | Retain `data/in-house_cohort_BCR_data.csv` in the tree and history; add explicit provenance/governance documentation. |
+| Phase 4a parity harness/internal modularization | **PENDING** | Add scientific parity tests and reusable internal functions without promising a public package API. |
 | Phase 4b AnnData/AIRR I/O | **PENDING; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
-| Interim Python→R bridge | **PENDING** | Follows 4b. |
-| Phase 4c R-core port | **PENDING** | Compare against the now-corrected R oracle with exact edge-set checks. |
-| Phase 2 Python plots | **DEFERRED** | Implement after 4c so plots use the lasting Python result object. |
-| Phase 3 tutorial | **DEFERRED** | Write against the packaged 4a/4b CLI rather than the legacy entry points. |
+| Phase 4c Python→R bridge | **PENDING** | Follows 4b and provides an end-to-end Python-facing scientific harness. |
+| Phase 4d R-core port | **PENDING** | Compare against the corrected R oracle with exact edge-set checks. |
+| Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
+| Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
+| Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
 
 ### Work log
 
+- **2026-07-18 — v2 sequencing and data-policy decisions.** Deferred distribution packaging
+  and public CLI stabilization until after the AnnData work, R bridge, Python core port, and
+  plots. Early Python work is limited to parity tests and the internal modular boundaries
+  required by those scientific tasks. Large migrated assets will be published to both Figshare
+  and a GitHub Release and removed from existing Git history; the Zenodo/DOI impact must be
+  documented before rewriting. The in-house cohort CSV will remain in both the tree and
+  history with explicit provenance/governance documentation.
 - **2026-07-18 — Phase 1 completion (`fix/convergence-reproducibility`).** Fixed the
   convergence norm in `R/util.R`; the corrected full pipeline still converged at iteration
   33 with an identical sparse edge set and numerical results. Added a checked-in SHA-256
@@ -72,7 +80,9 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 - Large committed data files: **move to figshare/GitHub release**; keep only small toy
   inputs in-tree — BUT do not move the reference outputs a phase still verifies against
   (see Phase 1 step 0).
-- Packaging target: **converge on Python + AnnData, single `pip install benisse`**;
+- Packaging target: **eventually converge on Python + AnnData, single `pip install benisse`**,
+  but defer distribution packaging and public API/CLI stabilization until the scientific core
+  and data model have stabilized;
   R core ported to Python test-first against the R implementation as reference oracle.
   Seurat users served via `.h5ad` export bridge, not a parallel R package.
 - **Competitive positioning & differentiation.** Benisse's moat is the **interpretable convex
@@ -95,7 +105,7 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
   **square of the sum**, not `sum(Δ^2)` (squared Frobenius norm) as intended. Since
   `sparse_graph` is 0/1, elementwise deltas are −1/0/+1 and cancel in the sum, so the
   stop metric under-measures change and can trigger early/false convergence. Genuine
-  correctness bug in the R core AND a landmine for the Phase 4c port (a "fixed" port will
+  correctness bug in the R core AND a landmine for the Phase 4d port (a "fixed" port will
   diverge from the wrong oracle). Confirmed against documented intent: `benisse_context.md`
   §8 states the stop criterion is the "mean squared per-entry change" (= `sum(Δ²)/n²`), which
   is exactly what the code fails to compute.
@@ -169,18 +179,20 @@ is compared object-by-object and PDFs by rasterized pages because their metadata
   loader `.append` sites, lifted the documented pin to pandas 2.3.3, and verified exact
   single-/multi-file encoder parity. Kept as a focused change within the public-facing
   reproducibility branch because it was already independently audited before the R fix.
-- **Large-file move + history rewrite** — move oracle-non-essential large files to
-  figshare/release; a real bloat reduction needs `git filter-repo`/BFG, which rewrites every
-  hash. HIGH blast radius: caution re the Zenodo DOI archive (README badge line 1). State
-  explicitly whether history is scrubbed or bloat stays.
-- **`data/in-house_cohort_BCR_data.csv` governance** — separate decision: confirm
-  consent/removal, then history scrub. Do not lump into the figshare move.
+- **DECIDED; implementation pending — large-file move + history rewrite.** Publish migrated
+  repository assets to both Figshare and a GitHub Release, then use `git filter-repo`/BFG for
+  real bloat reduction. HIGH blast radius: document the Zenodo DOI archive implications
+  (README badge line 1) before rewriting every historical commit hash. This decision does not
+  authorize redistribution of the separately downloaded AIRR fixture.
+- **DECIDED; documentation pending — `data/in-house_cohort_BCR_data.csv` governance.** Keep
+  this file in the tree and history and add explicit provenance/governance documentation. Do
+  not include it in the large-file history scrub.
 
 ## Phase 2 — New plotting functions
 NOTE (re-sequenced): all current plotting is R/ggplot (`post_analysis.R` `checkDist`,
 `plotClusters`) operating on the R `Benisse_results` RData object, which won't exist in
-Python until 4c. To avoid building throwaway R plotting that Phase 4 obsoletes, either
-(a) defer the *new* plots to after 4c and write them in Python, or (b) explicitly accept
+Python until 4d. To avoid building throwaway R plotting that Phase 4 obsoletes, either
+(a) defer the *new* plots to after 4d and write them in Python, or (b) explicitly accept
 these as interim R plots and don't invest in a "reusable module" twice. Recommended: (a),
 with only minimal fixes to existing R plots now.
 Planned plots: clonotype network colored by clone size / V-J family / graph cluster;
@@ -190,10 +202,10 @@ expression-vs-latent-distance correlation scatter (expose `testCor`).
 ## Phase 3 — User-friendliness & tutorials
 - Rewrite README against actual filenames and the conda/CPU workflow.
 - End-to-end runnable tutorial (notebook) on the toy dataset.
-- NOTE: "single wrapper / named flags instead of 11 positional args" overlaps the 4a
-  console entry point — do the CLI redesign **once** in 4a, not twice.
+- NOTE: defer the final wrapper, named flags, and tutorial until 4e so they document the
+  stable Python core and AnnData data model rather than transitional interfaces.
 
-## Phase 4 — Packaging (staged; Python + AnnData)
+## Phase 4 — Scientific modernization first; packaging last
 Rationale: encoder already Python/torch; contig input is standard 10x `all_contig` format
 (`prepare.R:8-10`) which scirpy reads natively; scanpy/scirpy is the immune-repertoire
 ecosystem. R core is a self-contained numerical routine; `update_Q` (eigendecomposition
@@ -206,12 +218,14 @@ gap to exploit. BiGCN ships `.xlsx/.csv/.pt` on Python 3.7 and is **not** AnnDat
 (`bigcn_context.md`), so a clean AnnData/scirpy Benisse is strictly more interoperable *today*
 (treat as a near-term opportunity, not an evergreen moat — competitors close it fast). mvTCR is
 a **working template** for exactly this design (AnnData/scirpy-native, `adata.obsm` I/O, PyPI
-`mvtcr`, scArches reference mapping — `mvtcr_context.md`); study it as prior art for 4a/4b rather
+`mvtcr`, scArches reference mapping — `mvtcr_context.md`); study it as prior art for 4b/4e rather
 than designing the packaging from scratch.
 
-- 4a — Package the Python encoder (`pyproject.toml`, `benisse/` package, console entry
-  point, model weight as package data). Strip DataParallel (`model_util.py:9`); note
-  training-path `.cuda()` breakage. Redesign the CLI here (absorb Phase 3's wrapper).
+- 4a — Scientific parity harness + minimal internal modularization. Add automated checks for
+  exact encoder output, stable R text outputs, semantic RData equality, rendered-plot parity,
+  and exact sparse edge-set agreement. Extract only the callable internal encoder boundaries
+  needed by tests and later adapters. Do **not** publish a package, promise a public Python API,
+  redesign the CLI, or rearrange model assets yet.
 - 4b — AnnData/AIRR I/O: read/write `.h5ad`/`.h5mu`; embeddings into `adata.obsm`.
   **Groundwork DONE:** AIRR best practices are distilled in local `airr_context.md`; the
   ignored Stephenson 5k MuData reference and deterministic AP4 203-cell BCR fixture are
@@ -221,14 +235,15 @@ than designing the packaging from scratch.
   derivation script, and test embedding writes without destroying the AIRR modality. Do not
   publish the downloaded/derived objects until their processed-data redistribution license is
   confirmed.
-- **Interim bridge (before 4c):** expose the core from Python via a thin subprocess/rpy2
+- 4c — Interim Python→R bridge. Expose the core from Python via a thin subprocess/rpy2
   wrapper around the UNMODIFIED `Benisse.R`, so users get end-to-end Python UX without
-  betting correctness on an unproven port.
-- 4c — Port the R core to Python against the R oracle, LAST, behind a strengthened parity
+  betting correctness on an unproven port. Treat this as an internal/scientific interface;
+  defer the polished public CLI.
+- 4d — Port the R core to Python against the R oracle behind a strengthened parity
   gate: assert **discrete edge-set agreement** on `sparse_graph` (e.g. exact/near-exact
   Jaccard on edge sets), NOT only elementwise tolerance on `latent_dist.txt` — because
-  `A>0` thresholding (`util.R:26-27`) means sub-tolerance drift can flip edges. First
-  The `util.R:38` convergence bug is resolved in the oracle: implement the corrected
+  `A>0` thresholding (`util.R:26-27`) means sub-tolerance drift can flip edges. The
+  `util.R:38` convergence bug is resolved in the oracle: implement the corrected
   `sum(delta^2)/n^2` definition and require the exact reference edge set.
   **Why port ADMM rather than replace it:** the ADMM sparse-graph is the differentiator —
   convex, interpretable, and it guarantees the learned graph is a strict sparse subset of the
@@ -236,9 +251,15 @@ than designing the packaging from scratch.
   successor path that gives exactly this up, so we deliberately keep ADMM. We do NOT hedge the
   port — leaning in is the strategy — but we validate the choice empirically via the competitive
   benchmark below, not by abandoning it.
-- 4d — Retire/legacy the R stage; add Seurat export bridge doc (`sceasy`/`zellkonverter`).
+- Phase 2 — Build the new plots against the stable Python result object after 4d.
+- 4e — Package and release-harden last. Add `pyproject.toml`, the installable `benisse/`
+  package, console entry point, model assets as package data, and the final named CLI. Strip
+  the runtime DataParallel wrapper (`model_util.py:9`) while retaining checkpoint compatibility;
+  document the training-path `.cuda()` limitation; add CI, installation tests, migration notes,
+  the tutorial, and the Seurat bridge (`sceasy`/`zellkonverter`). Retire/legacy the required R
+  stage only after the Python parity gate passes.
 
-Add minimal CI (lint + smoke run of toy example) and a small test suite alongside 4a.
+Start the test suite in 4a; defer distribution/install/CLI CI to 4e.
 
 ---
 
@@ -437,7 +458,7 @@ Phase 1 convergence-reproducibility fix. Start with alignment-free summaries + e
 
 ---
 
-## Competitive benchmark (after 4c / alongside Phase 5)
+## Competitive benchmark (after 4d / alongside Phase 5)
 The single missing piece a *revival* needs: an explicit head-to-head that defends the "keep
 ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?".
 - **Primary target = BiGCN.** It is the clean comparison: same domain, and it consumes the **same
@@ -456,14 +477,14 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 ## Sequencing summary (living)
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork.
 
-**NEXT:** merge `fix/convergence-reproducibility` into `develop/v2-modernization`, then use
-separate public-facing branches for: large-file/history policy (with DOI caveat) and in-house
-data governance → 4a (package encoder, CLI, strip DataParallel) → 4b (AnnData/AIRR I/O) →
-interim subprocess/R bridge → 4c (port behind exact edge-set parity gate) → 4d (retire R,
-Seurat bridge) → Phase 2 Python plots → competitive benchmark vs BiGCN (gated on paper access)
-→ Phase 5. Phase 3 documentation/tutorial work lands alongside 4a/4b when the lasting CLI and
-data model exist. Merge the integration branch to `main` and tag v2 only after the release
-gates below pass.
+**NEXT:** on separate public-facing branches, publish migrated large assets to Figshare and a
+GitHub Release, rewrite Git history with the DOI implications documented, and add governance
+documentation for the retained in-house cohort. Then proceed through 4a (parity harness and
+minimal internal modularization) → 4b (AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
+→ 4d (Python port behind the exact edge-set parity gate) → Phase 2 Python plots → 4e (package,
+public CLI, CI, tutorial, migration notes, Seurat bridge, and R-stage retirement) → competitive
+benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
+and tag v2 only after the release gates below pass.
 
 ### v2 release gates
 
