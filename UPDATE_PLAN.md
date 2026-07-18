@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 4a complete; Phase 4b AnnData/AIRR I/O is next
+Status: LIVING PLAN — Phase 4a audit follow-up active; Phase 4b contract merged
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -41,8 +41,8 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
 | Large-file/history cleanup | **PENDING** | Coordinate the remaining asset migration and one repository-wide history rewrite later; document Zenodo/DOI implications first. |
 | In-house cohort data | **DONE in active tree; history pending** | Archived on the existing Figshare record and removed from the repository tree at the maintainer's direction; remove its old blob during the coordinated history rewrite. |
-| Phase 4a parity harness/internal modularization | **DONE** | Pytest: 4 fast checks pass; the marked full Python+R oracle passes with exact encoder/text bytes, semantic RData equality, 3,382 exact sparse entries, and pixel-identical plots. |
-| Phase 4b AnnData/AIRR I/O | **PENDING — NEXT; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
+| Phase 4a parity harness/internal modularization | **DONE; audit strengthened** | Combined post-Phase-4b pytest: 29 passed, 1 slow skipped. Direct convergence cancellation coverage, true multi-file/order metamorphic cases, encoder schema checks, hash-ledger completeness, and R scientific invariants supplement the full oracle. |
+| Phase 4b AnnData/AIRR I/O | **DONE; open integration assumptions documented** | Claude Code's `61c91fb` was merged by PR #17 into `develop/v2-modernization` at `2e7a940`; synthetic and optional AP4 adapter tests, field mapping, embedding/result schemas, and derivation tooling are included. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
 | Phase 4c Python→R bridge | **PENDING** | Follows 4b and provides an end-to-end Python-facing scientific harness. |
 | Phase 4d R-core port | **PENDING** | Compare against the corrected R oracle with exact edge-set checks. |
 | Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
@@ -51,6 +51,29 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 
 ### Work log
 
+- **2026-07-18 — independent Phase 4a test audit follow-up
+  (`test/scientific-parity-harness`).** A fresh-context agent found that the single full oracle
+  was strong but could miss regression of the corrected convergence formula and lacked
+  metamorphic/invariant checks. Extracted `graphChangeMSE` for a direct opposing-change
+  cancellation test; replaced the duplicate-only multi-file assumption with disjoint file and
+  order-permutation cases; asserted the callable encoder's 20-dimensional finite schema;
+  asserted hash-ledger completeness; and added fast R checks for symmetry, bounds, positive
+  definiteness, graph support, and latent-distance properties. Added a 30-minute subprocess
+  timeout to the full harness. The audit also established that `sparse_graph.txt` is weighted
+  `A`, while binary adjacency lives in `results$sparse_graph`; downstream interfaces must keep
+  that distinction explicit. Fast result: 9 passed, 1 slow skipped. Full oracle after the R
+  helper extraction: 1 passed in 10m17s, converging at iteration 33 with exact stable outputs,
+  semantic RData equality, 3,382 binary sparse-matrix entries, and pixel-identical plots. After
+  rebasing onto merged Phase 4b, the combined fast suite passed 29 tests with 1 slow skip. Its
+  19 upstream warnings are retained as compatibility signals: Awkward-in-AnnData support is
+  experimental and MuData 0.4 will change `.update()` pull behavior.
+- **2026-07-18 — Claude Code Phase 4b merged.** Commit `61c91fb` (`Add Phase 4b AIRR/scverse
+  contract adapter and tests`) was merged by PR #17 into `develop/v2-modernization` at
+  `2e7a940`. It contains `airr_adapter.py`, `derive_ap4_encoder_input.py`,
+  `PHASE4B_NOTES.md`, and two adapter test modules. The contract is implemented and tested;
+  its documented open assumptions (notably R node ordering, result wiring, input surface,
+  count precedence, and final module placement) carry into Phases 4c/4e. Phase 4a audit
+  follow-up deliberately avoids modifying those files.
 - **2026-07-18 — Phase 4a scientific parity harness
   (`test/scientific-parity-harness`).** Extracted a callable `encode_bcr` boundary while
   preserving the legacy CLI. Added pytest coverage for CLI boolean parsing, exact callable
