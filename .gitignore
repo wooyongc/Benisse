@@ -10,5 +10,17 @@ __pycache__/
 # Claude Code local config / worktrees
 .claude/
 
+# Local coding-agent instructions and state
+.agents/
+.codex/
+AGENTS.md
+CLAUDE.md
+
+# Local project context notes
+*_context.md
+
+# Downloaded reference datasets (track data/manifest.yaml, not these objects)
+data/external/
+
 # Graphify knowledge-graph output (regenerable via `graphify update .`)
 graphify-out/

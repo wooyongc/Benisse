@@ -24,7 +24,10 @@ def load_BCRdata(opt):
         if index==0:
             full_data=f[['contigs','cdr3','cdr3_nt']]
         else:
-            full_data=full_data.append(f[['contigs','cdr3','cdr3_nt']])
+            full_data=pd.concat(
+                [full_data, f[['contigs','cdr3','cdr3_nt']]],
+                ignore_index=True,
+            )
     full_data=full_data.drop_duplicates(full_data.columns.difference(['contigs']),
                      keep='first')
     full_data=full_data.dropna()
@@ -51,7 +54,10 @@ def load_BCRdata2(opt):
         if index==0:
             full_data=f[['contigs','cdr3']]
         else:
-            full_data=full_data.append(f[['contigs','cdr3']])
+            full_data=pd.concat(
+                [full_data, f[['contigs','cdr3']]],
+                ignore_index=True,
+            )
     #Mock cdr3_nt, for the convenience of coding, do not affect the results.
     full_data['cdr3_nt']='TGTGCGAAATCGTATAGCAGAGACCTGCCGCGGTACTTTGGCTCCTGG'
     full_data=full_data.drop_duplicates(full_data.columns.difference(['contigs']),

@@ -1,0 +1,118 @@
+schema_version: 1
+generated_at: "2026-07-18T13:52:05-04:00"
+
+policy:
+  downloaded_objects_are_gitignored: true
+  redistribution: "Do not redistribute until the processed dataset license is confirmed."
+  integrity_algorithm: sha256
+
+objects:
+  - id: stephenson2021_5k
+    role: upstream_reference
+    local_path: data/external/stephenson2021_5k.h5mu
+    git_tracked: false
+    source:
+      provider: scverse Scirpy example data
+      dataset_loader: scirpy.datasets.stephenson2021_5k
+      loader_release: "0.24.0"
+      loader_release_commit: 05344e54f3adf9f376b2664b648e2452d589b75b
+      url: https://exampledata.scverse.org/scirpy/stephenson2021_5k.h5mu
+      documentation: https://scirpy.scverse.org/en/stable/generated/scirpy.datasets.stephenson2021_5k.html
+      registry_source: https://github.com/scverse/scirpy/blob/v0.24.0/src/scirpy/datasets/__init__.py
+      retrieved_at: "2026-07-18T13:52:05-04:00"
+      http_last_modified: "2025-07-26T19:00:07Z"
+      http_etag: '"c78ef9b34d44d92028e93d80c1ca26de-7"'
+    integrity:
+      bytes: 51886876
+      registry_md5: 6ea26f9d95525371ff9028f8e99ed474
+      observed_md5: 6ea26f9d95525371ff9028f8e99ed474
+      sha256: e48c7ba0c4e6d18a30035cb2d1a3214b0fb889c7bde5cc8b3c572e4affc83d95
+    structure:
+      container: MuData
+      observations: 5000
+      variables_total: 24929
+      modalities:
+        gex:
+          shape: [5000, 24929]
+          layers: [raw]
+        airr:
+          shape: [5000, 0]
+          obsm: [airr, chain_indices]
+      embedded_scirpy_version: 0.1.dev1084+g3b21fe9
+    citation:
+      title: Single-cell multi-omics analysis of the immune response in COVID-19
+      doi: https://doi.org/10.1038/s41591-021-01329-2
+    license:
+      scirpy_code: BSD-3-Clause
+      processed_dataset: pending_verification
+
+  - id: stephenson2021_ap4_203
+    role: deterministic_local_fixture
+    local_path: data/external/stephenson2021_ap4_203.h5mu
+    git_tracked: false
+    derived_from: stephenson2021_5k
+    derivation:
+      selection: "All observations where gex.obs['sample_id'] == 'AP4'."
+      ordering: "Cell identifiers sorted lexicographically before slicing."
+      random_sampling: false
+      transformations: "Observation subset only; no expression or AIRR filtering/normalization."
+      reader_environment:
+        python: 3.10.18
+        scirpy: 0.22.3
+        mudata: 0.3.10
+        anndata: 0.11.4
+        awkward: 2.10.0
+        numpy: 1.26.4
+        pandas: 2.3.3
+        numba: 0.61.2
+        llvmlite: 0.44.0
+    integrity:
+      bytes: 8867371
+      md5: 90888ae0797d6e5fb5e8211d936dcff8
+      sha256: fce71b2ba24472b77a296e2fc8fa05ed3e948206e5efabfde7970f5b60a8dc5f
+    structure:
+      container: MuData
+      observations: 203
+      variables_total: 24929
+      modalities:
+        gex:
+          shape: [203, 24929]
+          layers: [raw]
+        airr:
+          shape: [203, 0]
+          obsm: [airr, chain_indices]
+      airr_summary:
+        chains: 492
+        loci:
+          IGH: 233
+          IGK: 138
+          IGL: 121
+        productive_igh_with_junction_aa: 216
+        unique_productive_igh_junction_aa: 214
+        cells_with_productive_heavy_and_light: 203
+
+tooling_notes:
+  intended_scirpy_pin: "0.24.0"
+  intended_airr_pin: "2.0.0"
+  current_scirpy_0_24_local_status: unavailable
+  current_scirpy_0_24_local_reason: >-
+    Scirpy 0.24.0 requires Python >=3.12. On Intel macOS, pip found no compatible
+    Numba/llvmlite wheel and attempted a local OpenMP/LLVM build. The reference
+    object was therefore downloaded directly from Scirpy's checksum registry.
+  working_local_environment:
+    name: benisse-scirpy022
+    definition: environment-scirpy022.yml
+    python: 3.10.18
+    scirpy: 0.22.3
+    torch: 2.2.2
+    numpy: 1.26.4
+    pandas: 2.3.3
+    numba: 0.61.2
+    llvmlite: 0.44.0
+    airr: 2.0.0
+    dependency_check: passed
+    fixture_smoke_test: passed
+    note: >-
+      This compatibility environment reads the untouched 5k object and the AP4
+      fixture, and successfully runs scirpy.tl.chain_qc. It is isolated from the
+      legacy benisse environment.
