@@ -31,10 +31,8 @@ def parse_option():
         (BCR b-chain CDR3 sequences), or \
         a folder path where contains all and only BCR sequence data files. Output will be concatenate into \
         one output file.')
-    parser.add_argument('--atchley_factors',type=str,help='File that saved the Atchely factors')
-    parser.add_argument('--model',default=None,type=str,help='The trained model to apply (default: none)')
     parser.add_argument('--output_data',type=str,help='Encoded BCR sequences, the output data file')
-    parser.add_argument('--encode_dim',type=int,default=40,help='Columns of padded atchley matrix (default: 80)')
+    parser.add_argument('--encode_dim',type=int,default=40,help='Columns of padded atchley matrix (default: 40)')
     parser.add_argument('--pad_length',type=int,default=130,help='Length of padded nucleotide sequence (default: 130), \
         cells with nucleotide sequences longer than the length will be removed.')
     parser.add_argument('--cuda', default=True, type=strtobool, help='Whether to use CUDA to train model')
@@ -56,7 +54,7 @@ def embed(test_loader, model, device):
         feature_array.append(feature_array_tmp)
 
     feature_array = pd.concat(feature_array)
-    feature_array.sort_values(by=['index'], inplace=True)
+    feature_array.sort_values(by=['index'], inplace=True, kind='mergesort')
 
     return feature_array
 
@@ -78,7 +76,14 @@ if __name__ == '__main__':
     cdr_test, vdj_test, cdr3_seq_test = datasetMap_nt(test, aa_dict, opt.encode_dim, opt.pad_length)
     batch_size = 64
     random_seed = 123
-    test_indices = list(set(vdj_test.keys()))
+    # Reproducibility: seed RNGs and pin CPU threads so encoding is bit-deterministic.
+    # (Multi-threaded reduction order and hash-randomized set() ordering otherwise cause
+    #  ~1e-6 run-to-run drift, which propagates into the R stage.)
+    torch.manual_seed(random_seed)
+    np.random.seed(random_seed)
+    torch.set_num_threads(1)
+    # sorted() (not list(set(...))) makes iteration order independent of PYTHONHASHSEED
+    test_indices = sorted(set(vdj_test.keys()))
     cdr_shape = cdr_test[list(cdr_test.keys())[0]].shape[0]
     n_vdj = vdj_test[list(vdj_test.keys())[0]].size()[0]
     n_data = len(test_indices)
@@ -86,7 +91,7 @@ if __name__ == '__main__':
 
     test_set = Dataset(test_indices, cdr_test, vdj_test, cdr3_seq_test)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, 
-                                              shuffle=False, sampler=None, batch_sampler=None, num_workers=1)
+                                              shuffle=False, sampler=None, batch_sampler=None, num_workers=0)
 
     #Load model
     if torch.cuda.is_available():
@@ -110,11 +115,10 @@ if __name__ == '__main__':
 
     print("Loading trained model...")
 
-    if opt.cuda:
-        state = torch.load(os.path.dirname(os.path.abspath(__file__)) + "/dependency/trained_model.pt")
-    else:
-        state = torch.load(os.path.dirname(os.path.abspath(__file__)) + "/dependency/trained_model.pt", map_location=torch.device('cpu'))
-    
+    # Load onto the resolved device: map_location=device works for both CPU and CUDA,
+    # and avoids crashing when --cuda True is passed on a machine without a CUDA GPU.
+    state = torch.load(os.path.dirname(os.path.abspath(__file__)) + "/dependency/trained_model.pt", map_location=device)
+
     test_model = MyAlexNetCMC(in_feature=in_feature, feat_dim=feat_dim, freeze=True).to(device)
     contrast = NCEAverage(n_out_features, n_data, nce_k, device, nce_t, nce_m).to(device)
     criterion_cdr = NCESoftmaxLoss().to(device)

@@ -78,7 +78,7 @@ convertCluster=function(sparse_graph){
   for (i in 1:dim(sparse_graph)[1]){
     for (j in i:dim(sparse_graph)[1]){
       if (i==j) {next}
-      if (results$sparse_graph[i,j]==1){
+      if (sparse_graph[i,j]==1){
         if (clusters[i]==""){
           id=id+1
           clusters[i]=paste("cluster",id)
