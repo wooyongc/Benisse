@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 1 complete; data-release cleanup is next
+Status: LIVING PLAN — Phase 4a parity harness is next
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -39,9 +39,9 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | pandas 2 compatibility | **DONE** | Single- and multi-file encodes pass under pandas 2.3.3 with identical encoder SHA-256. |
 | AIRR/scirpy research fixture | **DONE** | `data/manifest.yaml`, ignored 5k `.h5mu`, deterministic AP4 203-cell fixture, and `environment-scirpy022.yml`. |
 | AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
-| Large-file/history cleanup | **PENDING — NEXT** | Publish migrated assets to both Figshare and a GitHub Release, then rewrite history with the Zenodo/DOI implications documented. |
-| In-house cohort governance | **PENDING; decision made** | Retain `data/in-house_cohort_BCR_data.csv` in the tree and history; add explicit provenance/governance documentation. |
-| Phase 4a parity harness/internal modularization | **PENDING** | Add scientific parity tests and reusable internal functions without promising a public package API. |
+| Large-file/history cleanup | **PENDING** | Coordinate the remaining asset migration and one repository-wide history rewrite later; document Zenodo/DOI implications first. |
+| In-house cohort data | **DONE in active tree; history pending** | Archived on the existing Figshare record and removed from the repository tree at the maintainer's direction; remove its old blob during the coordinated history rewrite. |
+| Phase 4a parity harness/internal modularization | **PENDING — NEXT** | Add scientific parity tests and reusable internal functions without promising a public package API. |
 | Phase 4b AnnData/AIRR I/O | **PENDING; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
 | Phase 4c Python→R bridge | **PENDING** | Follows 4b and provides an end-to-end Python-facing scientific harness. |
 | Phase 4d R-core port | **PENDING** | Compare against the corrected R oracle with exact edge-set checks. |
@@ -51,6 +51,11 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 
 ### Work log
 
+- **2026-07-18 — in-house cohort archival.** The maintainer confirmed that
+  `data/in-house_cohort_BCR_data.csv` was a reviewer-requested publication artifact and moved
+  it to the existing Benisse Figshare record. Removed it from the active repository tree
+  without adding a separate manifest. Its historical blob remains until the coordinated
+  repository-wide history rewrite.
 - **2026-07-18 — v2 sequencing and data-policy decisions.** Deferred distribution packaging
   and public CLI stabilization until after the AnnData work, R bridge, Python core port, and
   plots. Early Python work is limited to parity tests and the internal modular boundaries
@@ -184,9 +189,10 @@ is compared object-by-object and PDFs by rasterized pages because their metadata
   real bloat reduction. HIGH blast radius: document the Zenodo DOI archive implications
   (README badge line 1) before rewriting every historical commit hash. This decision does not
   authorize redistribution of the separately downloaded AIRR fixture.
-- **DECIDED; documentation pending — `data/in-house_cohort_BCR_data.csv` governance.** Keep
-  this file in the tree and history and add explicit provenance/governance documentation. Do
-  not include it in the large-file history scrub.
+- **DONE in active tree; history cleanup pending — `data/in-house_cohort_BCR_data.csv`.** The
+  maintainer confirmed it was shared on Figshare as a reviewer-requested publication artifact
+  and directed its removal from Git. Do not restore it or create a separate repository
+  manifest; include the old blob in the later coordinated history rewrite.
 
 ## Phase 2 — New plotting functions
 NOTE (re-sequenced): all current plotting is R/ggplot (`post_analysis.R` `checkDist`,
@@ -477,14 +483,14 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 ## Sequencing summary (living)
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork.
 
-**NEXT:** on separate public-facing branches, publish migrated large assets to Figshare and a
-GitHub Release, rewrite Git history with the DOI implications documented, and add governance
-documentation for the retained in-house cohort. Then proceed through 4a (parity harness and
-minimal internal modularization) → 4b (AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
+**NEXT:** proceed through 4a (parity harness and minimal internal modularization) → 4b
+(AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
 → 4d (Python port behind the exact edge-set parity gate) → Phase 2 Python plots → 4e (package,
 public CLI, CI, tutorial, migration notes, Seurat bridge, and R-stage retirement) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
-and tag v2 only after the release gates below pass.
+and tag v2 only after the release gates below pass. Coordinate the remaining large-asset move
+and one history rewrite before that release; the in-house cohort file is already absent from
+the active tree and its historical blob should be removed in that rewrite.
 
 ### v2 release gates
 
