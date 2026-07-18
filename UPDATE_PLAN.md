@@ -1,0 +1,476 @@
+# Benisse Update Plan
+
+Status: LIVING PLAN — Phase 1 complete on `fix/convergence-reproducibility`
+Date: 2026-07-18
+
+Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
+sequences, then an R sparse-graph model (`Benisse.R`) relates those embeddings to
+single-cell gene expression. Research code from a 2022 Nature Machine Intelligence
+paper, maintained as a legacy repo.
+
+> Context docs (local-only): `benisse_context.md` is the math/model authority (paper +
+> Supplementary Note 1, equation→code map — cite by §/Eq). `mvtcr_context.md` and
+> `bigcn_context.md` distill the two most relevant related methods; cite them where a plan
+> item touches positioning, packaging, or the sequence encoder. This plan is kept consistent
+> with all three.
+
+## Living status and release workflow
+
+This file is the project execution log as well as the roadmap. Update the dashboard and work
+log in the same branch as each material change. Status vocabulary: **DONE** (implemented and
+verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **DEFERRED**
+(intentionally sequenced later), and **BLOCKED** (requires a decision or external input).
+
+### Branch model
+
+- `main` remains the stable v1 line. Do not merge modernization work into it piecemeal.
+- `develop/v2-modernization` is the long-lived v2 integration branch.
+- Use public-facing topic branches such as `fix/convergence-reproducibility` and
+  `feature/anndata-io`; verify each topic before merging it into the integration branch.
+- Merge `develop/v2-modernization` into `main` only when the v2 release gates are complete,
+  then tag the release as v2.
+
+### Dashboard
+
+| Workstream | Status | Evidence / next gate |
+|---|---|---|
+| Phase 1 audit fixes and hygiene | **DONE** | Corrected pipeline converges at iteration 33; numerical/text outputs and rendered plots match the committed oracle. |
+| Reference-output baseline | **DONE** | `example/reference-output-hashes.sha256`; encoder and five stable R outputs reproduce byte-for-byte. RData is compared semantically and PDFs by rendered pixels because serialization metadata varies. |
+| pandas 2 compatibility | **DONE** | Single- and multi-file encodes pass under pandas 2.3.3 with identical encoder SHA-256. |
+| AIRR/scirpy research fixture | **DONE** | `data/manifest.yaml`, ignored 5k `.h5mu`, deterministic AP4 203-cell fixture, and `environment-scirpy022.yml`. |
+| AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
+| Large-file/history cleanup | **PENDING** | Requires a release/figshare destination and explicit history-rewrite/Zenodo decision. |
+| In-house cohort governance | **BLOCKED** | Confirm consent/retention and history-scrub policy before touching the committed human-subject data. |
+| Phase 4a Python packaging/CLI | **PENDING — NEXT** | Start from `develop/v2-modernization` on a new feature branch. |
+| Phase 4b AnnData/AIRR I/O | **PENDING; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
+| Interim Python→R bridge | **PENDING** | Follows 4b. |
+| Phase 4c R-core port | **PENDING** | Compare against the now-corrected R oracle with exact edge-set checks. |
+| Phase 2 Python plots | **DEFERRED** | Implement after 4c so plots use the lasting Python result object. |
+| Phase 3 tutorial | **DEFERRED** | Write against the packaged 4a/4b CLI rather than the legacy entry points. |
+
+### Work log
+
+- **2026-07-18 — Phase 1 completion (`fix/convergence-reproducibility`).** Fixed the
+  convergence norm in `R/util.R`; the corrected full pipeline still converged at iteration
+  33 with an identical sparse edge set and numerical results. Added a checked-in SHA-256
+  oracle ledger. Lifted the pandas documentation pin after replacing all live
+  `DataFrame.append` calls and verifying both single- and multi-file encoding. Pinned the
+  combined Scirpy/encoder compatibility environment to Python 3.10, Scirpy 0.22.3,
+  NumPy 1.26.4, pandas 2.3.3, Torch 2.2.2, Numba 0.61.2, and llvmlite 0.44.0.
+- **2026-07-18 — AIRR groundwork.** Saved local AIRR/scirpy best-practice context in
+  gitignored `airr_context.md`; downloaded Scirpy's Stephenson 5k MuData object into
+  gitignored `data/external/`; derived a deterministic 203-cell, BCR-complete AP4 fixture;
+  recorded provenance, structure, versions, and hashes in `data/manifest.yaml`. Redistribution
+  remains blocked on processed-dataset license verification.
+- **Previously merged — reproducibility/audit fixes (`a218ced`, `33df5f5`).** Added seeded,
+  single-threaded deterministic encoding; fixed CPU checkpoint loading and `convertCluster`;
+  removed dead CLI arguments and tracked repository cruft; refreshed the original example
+  references and README.
+
+## Decisions locked in
+- Scope: **all four phases**.
+- Large committed data files: **move to figshare/GitHub release**; keep only small toy
+  inputs in-tree — BUT do not move the reference outputs a phase still verifies against
+  (see Phase 1 step 0).
+- Packaging target: **converge on Python + AnnData, single `pip install benisse`**;
+  R core ported to Python test-first against the R implementation as reference oracle.
+  Seurat users served via `.h5ad` export bridge, not a parallel R package.
+- **Competitive positioning & differentiation.** Benisse's moat is the **interpretable convex
+  sparse-graph "BCR networks"** (the support of `A` is a strict subset of the V/J crude graph —
+  `benisse_context.md` §5) — an explainable, sparse output that newer methods give up. We do
+  **NOT** chase BiGCN's GCN fusion (`bigcn_context.md`) or mvTCR's generative VAE
+  (`mvtcr_context.md`); those are more scalable but black-box and answer different questions
+  (cell-level embeddings, not sparse interpretable networks). Lead the pitch with interpretability
+  + usability. Caveat: BiGCN (Small Methods 2026) **reuses Benisse's Atchley→contrastive 20-d
+  encoder and V/J crude graph wholesale** — that validates the encoder but also **commoditizes**
+  it, so the encoder is table-stakes, NOT the headline differentiator. The sparse-graph model is.
+
+---
+
+## Audit findings (grounded in current code; verified by a second independent pass)
+
+### Real bugs / latent defects
+- **DONE 2026-07-18 — `R/util.R:38` convergence-criterion operator-precedence bug.**
+  `sum(res[[r]]-res_back[[r]])^2/nrow(sparse_graph)^2` parses as `(sum(Δ))^2`, i.e. the
+  **square of the sum**, not `sum(Δ^2)` (squared Frobenius norm) as intended. Since
+  `sparse_graph` is 0/1, elementwise deltas are −1/0/+1 and cancel in the sum, so the
+  stop metric under-measures change and can trigger early/false convergence. Genuine
+  correctness bug in the R core AND a landmine for the Phase 4c port (a "fixed" port will
+  diverge from the wrong oracle). Confirmed against documented intent: `benisse_context.md`
+  §8 states the stop criterion is the "mean squared per-entry change" (= `sum(Δ²)/n²`), which
+  is exactly what the code fails to compute.
+- **DONE (`a218ced`)** — `post_analysis.R:74/:81` — `convertCluster(sparse_graph)` ignored its own parameter and
+  reads the **global** `results$sparse_graph`. Works only because `Benisse.R:92/:97` has a
+  global `results` passed as the identical object. Genuine latent bug.
+- **DONE 2026-07-18** — pandas 2 compatibility. The encoder already accumulated batches in
+  a list; both remaining loader `DataFrame.append` calls were replaced with `pd.concat` and
+  single-/multi-file parity was verified under pandas 2.3.3.
+- **DONE (`a218ced`)** — `AchillesEncoder.py` CPU/CUDA checkpoint loading. The root cause was:
+  `:99 if opt.cuda:` branches on the **flag**, not the resolved `device` from `:85`. On a
+  CPU-only machine `--cuda True` sets `device=cpu` but `:100 torch.load(...)` still runs
+  without `map_location` and errors if the checkpoint holds CUDA tensors. README `:111`
+  ships `--cuda True` as the example → the failing invocation. Fix: always pass
+  `map_location=device`, branch on `device`.
+- **DONE (`a218ced`)** — `--atchley_factors` / `--model` were declared but never used;
+  paths hardcoded (`:57`, `:100/:102`). Dead/misleading.
+
+### Style / robustness
+- `prepare.R:7` uses `attach(contigs)`/`detach()` — deprecated, fragile scoping.
+- `getLatentTdist` recomputed >=4x per run (in `checkDist`, in `testCor`
+  `post_analysis.R:97` via `plotClusters`, and `Benisse.R:103`).
+- `CMC/contrast_util.py:109` `.cuda()` and `CMC/alias_multinomial.py:46-47` — training path
+  is not CPU-runnable (inference/encode path never reaches these, so encoding is safe).
+- `CMC/model_util.py:9` `nn.DataParallel` wrap — adds `module.` state-dict prefix, pointless
+  on CPU; a clean package should unwrap it.
+- `AchillesEncoder.py:44` `--encode_dim` help says "default: 80" but `default=40`;
+  `--pad_length` is user-settable yet `in_feature=130` is hardcoded (`:88`), so changing
+  `--pad_length` silently breaks the model.
+- Hardcoded `batch_size`/seeds/hyperparams (`AchillesEncoder.py:65-66,:87-95`); R
+  hyperparams read positionally (`Benisse.R:73-79`).
+
+### Repo hygiene / docs / data governance
+- **DONE (`a218ced`)** — removed committed junk: `.Rhistory`, `.idea/.gitignore`, `CMC/.DS_Store`,
+  `R/.DS_Store`, `example/.DS_Store`, `figs/.DS_Store`.
+- **DONE (`a218ced`, Phase 1 completion)** — extended `.gitignore` for OS/editor cruft,
+  local agent/context files, downloaded AIRR objects, and regenerable graph output.
+- Repo bloat (git blobs): `example/Benisse_results.RData` ~49M, `latent_dist.txt` ~36M,
+  `10x_NSCLC_exp.csv` ~15M, `data/in-house_cohort_BCR_data.csv` ~10M,
+  `example/sparse_graph.txt` ~4.3M, `example/cleaned_exp.txt` ~3.1M, `figs/*.png` ~3.2M.
+- **`data/in-house_cohort_BCR_data.csv` (NEW governance item).** Unreferenced 10 MB
+  human-subjects BCR data (committed in `60161c4`), no consent/governance note. `git rm`
+  won't remove it from history — needs a data-governance decision + history scrub.
+- **DONE (`a218ced`, Phase 1 completion)** — README defects: `pip install sklearn` (broken stub); Python 3.7 / R 4.0.2;
+  `:20` torch 1.10 / pandas 1.3.4 / sklearn 1.0 / numpy 1.21.3; `:67/:69` broken hyperlink
+  filenames (`_contig.csv` vs `_contigs.csv`, `_contig_exp.csv` vs `_exp.csv` — display
+  text is correct); `:30-59` venv instructions conflicting with the conda workflow.
+- No test suite, no CI, no packaging metadata.
+
+---
+
+## Phase 1 — Audit fixes & hygiene — DONE 2026-07-18
+**Step 0: snapshot content hashes** of all current reference outputs
+(`encoded_10x_NSCLC.csv`, `sparse_graph.txt`, `latent_dist.txt`, `clone_annotation.csv`,
+etc.) and record seed determinism. **DONE:** the committed baseline is recorded in
+`example/reference-output-hashes.sha256`. Stable text outputs are byte-compared; `.RData`
+is compared object-by-object and PDFs by rasterized pages because their metadata is volatile.
+
+1. **DONE:** `convertCluster` uses its parameter, not the global.
+2. **DONE:** fixed `util.R:38` to compute `sum(delta^2)/n^2`. The corrected oracle still
+   converges at iteration 33 and produces the identical edge set, so no scientific rebaseline
+   was needed.
+3. **DONE:** encoder always loads the checkpoint with `map_location=device`.
+4. **DONE:** removed dead `--atchley_factors` / `--model` arguments.
+5. **DONE:** extended `.gitignore` and removed tracked OS/editor/Python cruft.
+6. **DONE:** fixed README dependencies, filenames, versions, and conda workflow.
+7. **DONE:** reran both pipeline stages with `--cuda False` and verified against the oracle.
+
+### Split out of Phase 1 (own PRs)
+- **DONE on the Phase 1 completion branch — pandas-pin lift.** Replaced the two remaining
+  loader `.append` sites, lifted the documented pin to pandas 2.3.3, and verified exact
+  single-/multi-file encoder parity. Kept as a focused change within the public-facing
+  reproducibility branch because it was already independently audited before the R fix.
+- **Large-file move + history rewrite** — move oracle-non-essential large files to
+  figshare/release; a real bloat reduction needs `git filter-repo`/BFG, which rewrites every
+  hash. HIGH blast radius: caution re the Zenodo DOI archive (README badge line 1). State
+  explicitly whether history is scrubbed or bloat stays.
+- **`data/in-house_cohort_BCR_data.csv` governance** — separate decision: confirm
+  consent/removal, then history scrub. Do not lump into the figshare move.
+
+## Phase 2 — New plotting functions
+NOTE (re-sequenced): all current plotting is R/ggplot (`post_analysis.R` `checkDist`,
+`plotClusters`) operating on the R `Benisse_results` RData object, which won't exist in
+Python until 4c. To avoid building throwaway R plotting that Phase 4 obsoletes, either
+(a) defer the *new* plots to after 4c and write them in Python, or (b) explicitly accept
+these as interim R plots and don't invest in a "reusable module" twice. Recommended: (a),
+with only minimal fixes to existing R plots now.
+Planned plots: clonotype network colored by clone size / V-J family / graph cluster;
+UMAP/t-SNE of latent space with graph edges; clone-size + edges-remaining diagnostics;
+expression-vs-latent-distance correlation scatter (expose `testCor`).
+
+## Phase 3 — User-friendliness & tutorials
+- Rewrite README against actual filenames and the conda/CPU workflow.
+- End-to-end runnable tutorial (notebook) on the toy dataset.
+- NOTE: "single wrapper / named flags instead of 11 positional args" overlaps the 4a
+  console entry point — do the CLI redesign **once** in 4a, not twice.
+
+## Phase 4 — Packaging (staged; Python + AnnData)
+Rationale: encoder already Python/torch; contig input is standard 10x `all_contig` format
+(`prepare.R:8-10`) which scirpy reads natively; scanpy/scirpy is the immune-repertoire
+ecosystem. R core is a self-contained numerical routine; `update_Q` (eigendecomposition
+matrix function, `update.R:51-60`) ports parity-safe, but `update_A` (bounded L-BFGS-B,
+`update.R:1-49`) is the risk (R `factr`/`maxit` vs scipy `ftol`/`gtol`/`maxiter`; path
+dependence compounds across ADMM iterations).
+
+**Competitive stakes for this phase:** AnnData-native is not just convenience — it's a live
+gap to exploit. BiGCN ships `.xlsx/.csv/.pt` on Python 3.7 and is **not** AnnData-native
+(`bigcn_context.md`), so a clean AnnData/scirpy Benisse is strictly more interoperable *today*
+(treat as a near-term opportunity, not an evergreen moat — competitors close it fast). mvTCR is
+a **working template** for exactly this design (AnnData/scirpy-native, `adata.obsm` I/O, PyPI
+`mvtcr`, scArches reference mapping — `mvtcr_context.md`); study it as prior art for 4a/4b rather
+than designing the packaging from scratch.
+
+- 4a — Package the Python encoder (`pyproject.toml`, `benisse/` package, console entry
+  point, model weight as package data). Strip DataParallel (`model_util.py:9`); note
+  training-path `.cuda()` breakage. Redesign the CLI here (absorb Phase 3's wrapper).
+- 4b — AnnData/AIRR I/O: read/write `.h5ad`/`.h5mu`; embeddings into `adata.obsm`.
+  **Groundwork DONE:** AIRR best practices are distilled in local `airr_context.md`; the
+  ignored Stephenson 5k MuData reference and deterministic AP4 203-cell BCR fixture are
+  recorded in `data/manifest.yaml` with checksums and provenance; Scirpy 0.22.3 is working
+  on this Intel Mac via `environment-scirpy022.yml`. **Pending implementation:** define the
+  explicit AIRR→Benisse heavy-chain selection and field mapping, add a reproducible fixture
+  derivation script, and test embedding writes without destroying the AIRR modality. Do not
+  publish the downloaded/derived objects until their processed-data redistribution license is
+  confirmed.
+- **Interim bridge (before 4c):** expose the core from Python via a thin subprocess/rpy2
+  wrapper around the UNMODIFIED `Benisse.R`, so users get end-to-end Python UX without
+  betting correctness on an unproven port.
+- 4c — Port the R core to Python against the R oracle, LAST, behind a strengthened parity
+  gate: assert **discrete edge-set agreement** on `sparse_graph` (e.g. exact/near-exact
+  Jaccard on edge sets), NOT only elementwise tolerance on `latent_dist.txt` — because
+  `A>0` thresholding (`util.R:26-27`) means sub-tolerance drift can flip edges. First
+  The `util.R:38` convergence bug is resolved in the oracle: implement the corrected
+  `sum(delta^2)/n^2` definition and require the exact reference edge set.
+  **Why port ADMM rather than replace it:** the ADMM sparse-graph is the differentiator —
+  convex, interpretable, and it guarantees the learned graph is a strict sparse subset of the
+  crude graph (`benisse_context.md` §5). BiGCN's GCN fusion (`bigcn_context.md`) is a known
+  successor path that gives exactly this up, so we deliberately keep ADMM. We do NOT hedge the
+  port — leaning in is the strategy — but we validate the choice empirically via the competitive
+  benchmark below, not by abandoning it.
+- 4d — Retire/legacy the R stage; add Seurat export bridge doc (`sceasy`/`zellkonverter`).
+
+Add minimal CI (lint + smoke run of toy example) and a small test suite alongside 4a.
+
+---
+
+## v2 (out of current scope) — Atchley → ESM2 / protein-LM embedding upgrade
+
+Assessment of replacing the hand-crafted Atchley featurization with a pretrained protein
+language model (ESM2 or an antibody-specific PLM). Grounded in the actual encoder.
+
+### What the current encoder actually is (inference path)
+- Two-view CMC (Contrastive Multiview Coding). View 1: CDR3H aa seq → Atchley factors
+  (5-dim/residue, `data_pre.py:63-77`) padded to `encode_dim=40` → 2D CNN
+  `alexnet_cdr_to_vdj` (`model_util.py:30-76`) → `feat_dim=20`. View 2: nucleotide seq →
+  ordinal encoding → 1D CNN.
+- KEY: at inference the nt/VDJ view is **mocked** (`data_pre.py:56` fixed dummy nt) and its
+  output is **discarded** — only `feat_cdr` is written (`AchillesEncoder.py:122-124`). So the
+  R model consumes a 20-dim vector from the frozen Atchley→CNN branch alone. The contrastive
+  training only produced the frozen weights; it is not exercised at inference.
+- Consequence: swapping to ESM2 = replacing one frozen featurizer/encoder with another. It
+  does NOT require reproducing the contrastive setup at inference time.
+
+### Would it work? Yes. Two strategies, very different effort.
+
+**Strategy A — raw PLM embedding as a drop-in encoder (recommended first step).**
+CDR3H → ESM2 → mean-pool over residues → (optional linear/PCA projection) → feed R model.
+- No retraining of a contrastive model needed. ESM2 embeddings used directly.
+- Dimension handling is the main code touch: pooled ESM2 is 320-1280 dim; the R stage
+  hardcodes a 20-col slice (`Benisse.R:68` `contigs_encoded[...,1:20]`). Either project ESM2
+  → 20-dim (PCA/linear) or generalize that slice + `m`. Modest, localized change.
+- Compute on this Intel Mac (CPU, no CUDA): esm2_t6_8M (320-dim) / t12_35M (480-dim) run fine
+  on CPU for short CDR3H (~10-25 aa) — seconds-to-minutes on the toy set. 650M/3B are
+  CPU-slow but toy-feasible; large cohorts want GPU. Dependency: `fair-esm` or HF
+  `transformers`; weight download ~30MB (8M) to ~2.5GB (650M).
+- Effort: ~1-2 weeks. Prototype in days. Bulk of the work is revalidation — this changes the
+  scientific output, so benchmark ESM2-vs-Atchley embeddings through the full pipeline on the
+  paper/toy data (graph quality, expression-latent correlation) before adopting.
+
+**Strategy B — keep the CMC framework, swap Atchley for per-residue ESM2 features, retrain.**
+Feed ESM2 (L×320) into the CNN instead of Atchley (L×5); retrain `trained_model.pt`.
+- Requires: the original training corpus (large BCR repertoire — NOT in repo; referenced only
+  by dead server pkl paths at `data_pre.py:110-115`), the training script
+  (`CMC/AchillesEncoder_train.py` exists), and GPU (contrastive NCE training over large N is
+  GPU-bound; `contrast_util.py:109` hardcodes `.cuda()` — training is not CPU-runnable).
+- Effort: HIGH, research-grade — ~1-3 months + GPU + data access + revalidation. Only justified
+  if Strategy A shows the downstream model benefits from richer embeddings.
+
+### Better target than vanilla ESM2?
+ESM2 is trained on general UniRef proteins. For BCR/antibody CDR3H specifically, antibody-
+specialized PLMs often embed better: AntiBERTy, AbLang/AbLang2, IgBert, BALM, or ESM fine-
+tuned on OAS. Caveat: CDR3H in isolation (no framework/VH context) is short and hypervariable;
+some antibody PLMs expect fuller VH. If investing, evaluate an antibody-specific PLM alongside
+ESM2 rather than assuming generic ESM2 is the ceiling.
+
+Related-method evidence (`mvtcr_context.md`): mvTCR encodes CDR3 with **transformers trained
+from scratch** (not a pretrained PLM) and still beats hand-crafted/dataset-level baselines. Two
+takeaways: (a) independent support that a **learned** sequence encoder beats a hand-crafted
+featurization for CDR3 — strengthens the case for moving off Atchley; (b) but it is **agnostic
+on pretrained-vs-scratch**, so it does NOT specifically vindicate ESM2. ESM2's edge remains
+"skip training entirely," which is exactly why Strategy A is ranked first — no change to the
+A-first ordering.
+
+### v2 recommendation
+1. Do Strategy A as a cheap ablation FIRST — it answers "do richer embeddings even help the
+   sparse-graph model?" for ~days of work.
+2. Fits the Phase 4 Python/AnnData packaging cleanly (ESM2 is Python/torch; drop the Atchley
+   CSV + CNN weights in favor of a PLM call).
+3. Escalate to Strategy B or antibody-PLM fine-tuning only if A is promising.
+4. Always keep the Atchley encoder as the reference/baseline for benchmarking — do not delete
+   `dependency/trained_model.pt` or `Atchley_factors.csv` when adding a PLM path.
+
+---
+
+## Phase 5 (candidate) — Differential / comparative analysis between conditions
+
+Motivation: Benisse today is descriptive per-sample (one sparse clonotype graph + latent
+distances per dataset). Most biological/clinical value in single-cell tools comes from
+contrasts (responder vs non-responder, pre/post therapy, tumor vs normal, vaccine timepoints).
+Adding a principled between-condition comparison layer is high value. NOTE: the R core has a
+thin `sample` hook (`R/initiation.R:7-11`, `util.R` `Benisse(..., sample=NA)`) but it only
+prefixes V/J crude-cluster labels for multi-sample-in-one-library runs — NOT a differential
+mechanism.
+
+### Paper precedent — the sound comparison already exists in the method
+`benisse_context.md` §9 shows the authors' COVID-19 analysis (Fig. 3g / SN1 Fig. 8) is itself
+a between-condition comparison: the **distribution of the BCR↔expression coupling correlation**
+is tighter (higher mean, smaller SD) in severe/recovering than in cured/healthy. That coupling
+is the model's core validation metric (§9): `cor(a,b)` vs `cor(a,c)` where a = B-cell RNA-
+expression distances, b = latent BCR distances, c = original BCR distances (success = latent
+beats original, `cor(a,b) > cor(a,c)`). It is **already computed per run** by `testCor`
+(`post_analysis.R:96-120`, returns `c1=cor_ab`, `c2=cor_ac`).
+Implication for Phase 5: the coupling correlation is an **invariant scalar/distribution** — it
+sidesteps the node-identity and non-comparable-latent-space blind spots entirely, has published
+precedent, and needs almost no new math. Make it the PRIMARY comparison axis; treat graph-
+topology and node-level diffs as secondary layers built on top.
+
+### Blind spots that make naive "diff two adjacency matrices" wrong
+1. **Node-identity mismatch (central obstacle).** BCR CDR3H is hypervariable; two conditions
+   (esp. two donors) share almost no identical clonotypes. Cannot subtract A vs B — node sets
+   barely overlap. Need CDR3H correspondence (V-J + edit-distance clustering) OR node-set-
+   agnostic graph-level/distributional comparison.
+2. **Latent spaces not comparable across runs.** Each run learns its own `Q`/embedding on that
+   condition's expression (absorbs batch effects). Raw `latent_dist.txt` is not comparable
+   across conditions. Need a joint/anchored embedding or comparison of invariants only.
+3. **Size/depth confounds.** Clonotype count, clone-size distribution, seq depth differ; graph
+   density/edges/components scale with N (the `reEdge` ratio is size-dependent). Must normalize
+   for node count + clone-size distribution or detect sampling artifacts.
+4. **n=1 inference.** Needs replicates (multiple donors/condition) + a null (permute condition
+   labels across donors, bootstrap over cells) to separate biology from within-condition noise.
+5. **Run stochasticity.** The `util.R:38` convergence bug is fixed; still establish within-
+   condition graph reproducibility (edge stability) before trusting between-condition diffs.
+
+### Suggested features (soundness order)
+- Alignment-free per-condition graph summaries (density, degree dist, modularity, assortativity,
+  component-size dist, clustering coeff) + KS/earth-mover comparison of the within- vs cross-
+  cluster latent-distance distributions. Node-set-agnostic; do first.
+- Matched-clone differential: cluster CDR3H across conditions, then per matched clone compute
+  differential clone size (expansion/contraction), differential connectivity ("rewiring score"),
+  and differential expression of that clone's cells.
+- Joint/anchored embedding (co-train with condition covariate, or integrate expression first)
+  so latent distances are comparable — fixes blind spot #2. CAUTION (`mvtcr_context.md`): mvTCR
+  found **naive expression integration hurts** — Harmony dropped NMI 0.456→0.212, recovered only
+  by a conditional model + scArches. So treat this step as risky and keep the alignment-free
+  coupling-correlation as the PRIMARY axis (as above); rank joint-embedding below it.
+- **Reference mapping (NEW axis, from mvTCR).** scArches-style "map a new sample onto a fixed
+  reference/atlas" (`mvtcr_context.md`) — a comparison mode Benisse has no analogue for today,
+  distinct from the pairwise between-condition diffs. Lets a new dataset be positioned against an
+  established Benisse reference instead of only A-vs-B. Higher effort; treat as a stretch axis.
+- Differential connectivity with a null model (permutation over donor labels; bootstrap CIs).
+
+### General (non-comparative) calculation features that raise value
+- Edge stability / bootstrap edge-confidence on the sparse graph (also cures blind spot #5).
+- SHM (somatic hypermutation) overlay — the affinity-maturation mechanism Benisse claims to
+  capture; test whether graph neighbors share mutational lineage.
+- Clonotype centrality / hub detection.
+- Affinity-maturation trajectory: MST/diffusion ordering over latent distances → clonal-evolution
+  pseudotime.
+- Isotype / class-switch overlay (IgM/IgG/IgA from contigs) on the graph.
+
+### Node/network-level differential via prime & trajectory groups (biologically grounded)
+`benisse_context.md` §10 gives ready-made per-network readouts that form monotone gradients:
+each BCR network has a **prime** clonotype (latest-created by Monocle2 pseudotime) and
+**trajectory groups 1/2/3** (by latent distance from the prime; group 1 = closest). Activation-
+signature score, clonal size, and class-switch rate all peak in group 1 and decline outward.
+Comparative use: compare the **gradient itself** across conditions (e.g. does the group-1
+activation advantage steepen in responders?) — a low-dimensional, node-alignment-free contrast
+that is directly interpretable as "sharper affinity maturation." This turns the paper's own
+descriptive framework into a differential readout.
+Cross-check note: BiGCN (`bigcn_context.md`) targets the same B-cell functional-state and
+maturation→class-switch biology; validate these Phase-5 readouts (and the class-switch overlay
+above) against its published claims where they overlap.
+
+### Visualization design (how to actually SEE the comparison)
+Grounded in what Benisse emits (`sparse_graph.txt`/`A`, `latent_dist.txt`, `clone_annotation.csv`
+with `graph_label`+`clsize`, `testCor` `cor_ab`/`cor_ac`, plus prime/group + activation/class-
+switch from §10). A layered system, cheap→rich, matching the soundness order:
+
+1. **Coupling-strength comparison (primary; paper precedent, alignment-free).**
+   Grouped violin/box of the per-network (or bootstrap-resampled) coupling correlation, one
+   group per condition — the Fig. 3g idiom. Overlay paired `cor_ab` vs `cor_ac` (points +
+   connecting line) so "latent beats original" is visible within each condition. Add replicate
+   donors as jittered points. Reads as: "coupling is tighter in condition X." Earth-mover/KS
+   distance annotated between conditions.
+2. **Graph-summary slopegraph / radar.** Alignment-free stats (density, modularity, mean degree,
+   #components, edges-remaining ratio) as a slopegraph (A→B line per metric, replicate CIs) or a
+   two-series radar. One glance at which structural properties move.
+3. **Within- vs cross-network latent-distance distributions, faceted by condition.** Extends the
+   existing `in_cross_dist_check` plot to a small-multiple (condition × distance-class); the shift
+   between facets is the structural change.
+4. **Differential / merged network graph (the intuitive "two graphs" picture).** Requires CDR3H
+   node-matching across conditions. Lay the union graph out ONCE (shared coordinates); color
+   EDGES by presence — condition-A-only / B-only / shared — and color NODES by clone-size log2FC
+   (expanded vs contracted), size by mean clone size. This is the single most legible "compare
+   the graphs" visual; gated on the matching step, so it comes after the alignment-free layers.
+5. **BCR-network membership alluvial/Sankey.** Clonotypes flow from A's networks to B's networks,
+   exposing merging/splitting of BCR networks between conditions (needs node-matching).
+6. **Differential-connectivity volcano.** Per matched clonotype/cluster: x = connectivity/rewiring
+   log2FC, y = −log10(permutation p), colored by significance. Familiar to biologists; needs the
+   replicate/null-model layer.
+7. **Trajectory-group gradient panels.** Per condition, group 1/2/3 on x, activation / clonal
+   size / class-switch on y (small multiples); overlaying conditions shows whether the affinity-
+   maturation gradient sharpens. Directly visualizes the §10 differential above.
+8. **Prime-centered mirror ("starburst").** For a network present in both conditions, radial
+   layout centered on the prime, spoke length = latent distance to prime; condition A left,
+   B right, mirrored — shows contraction/expansion of a single network's structure.
+
+Design notes: keep one color encoding for CONDITION across every panel (a two-condition
+qualitative pair) and a separate diverging scale reserved for log2FC (expanded↔contracted);
+never reuse the condition hue for magnitude. Everything must render in light and dark and be
+colorblind-safe. When building any of these, load the `dataviz` skill before writing chart code.
+Layers 1–3 need no node matching and ship first; 4–8 depend on the matching / replicate layers.
+
+### Sequencing
+Do AFTER Phase 4 (Python/AnnData core) — a fair comparison needs the joint embedding and
+replicate handling that are far easier in the packaged Python stack — and it depends on the
+Phase 1 convergence-reproducibility fix. Start with alignment-free summaries + edge stability
+(cheap, sound, no node matching), then matched-clone differential, then joint embedding.
+
+---
+
+## Competitive benchmark (after 4c / alongside Phase 5)
+The single missing piece a *revival* needs: an explicit head-to-head that defends the "keep
+ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?".
+- **Primary target = BiGCN.** It is the clean comparison: same domain, and it consumes the **same
+  encoder input** as Benisse (Atchley→contrastive 20-d + V/J crude graph — `bigcn_context.md`).
+  Benchmark Benisse's interpretable sparse networks vs BiGCN's GCN embedding on functional-state
+  annotation and maturation-trajectory recovery, plus an interpretability/sparsity contrast that
+  plays to Benisse's strength.
+- **Gate on access:** BiGCN's fusion internals, loss, and training are **paywalled/not public**
+  (`bigcn_context.md`) — obtain the full paper + supp (and run the authors' `Lxc417/BiGCN` repo)
+  BEFORE making any firm benchmarking or "successor" claim. Do not plan as if the architecture
+  is known.
+- **Secondary:** cite mvTCR as external precedent for the comparative idioms (between-donor,
+  time-course, reference mapping) rather than re-deriving them.
+- Output: a positioning subsection for the revived README / release notes.
+
+## Sequencing summary (living)
+**DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork.
+
+**NEXT:** merge `fix/convergence-reproducibility` into `develop/v2-modernization`, then use
+separate public-facing branches for: large-file/history policy (with DOI caveat) and in-house
+data governance → 4a (package encoder, CLI, strip DataParallel) → 4b (AnnData/AIRR I/O) →
+interim subprocess/R bridge → 4c (port behind exact edge-set parity gate) → 4d (retire R,
+Seurat bridge) → Phase 2 Python plots → competitive benchmark vs BiGCN (gated on paper access)
+→ Phase 5. Phase 3 documentation/tutorial work lands alongside 4a/4b when the lasting CLI and
+data model exist. Merge the integration branch to `main` and tag v2 only after the release
+gates below pass.
+
+### v2 release gates
+
+- Fresh environment install succeeds on supported CPU platforms.
+- Packaged encoder and AnnData/AIRR round-trip tests pass on the deterministic fixture.
+- Python-facing end-to-end workflow reproduces the R oracle's discrete sparse edge set.
+- Large-file location, Zenodo/DOI implications, and human-subject data governance are resolved
+  and documented.
+- CI smoke tests, user tutorial, migration notes, and license/redistribution statements pass
+  review.

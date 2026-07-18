@@ -17,7 +17,7 @@ Python (version 3.10), R (version 4.3)
 
 **Python Packages**
 
-pytorch (version 2.2.2, CPU build), pandas (version 1.5.3), scikit-learn, and numpy (version 1.26.4)
+pytorch (version 2.2.2, CPU build), pandas (version 2.3.3), scikit-learn, and numpy (version 1.26.4)
 
 **R Packages**
 
@@ -45,11 +45,23 @@ conda activate benisse
 # Install dependencies.
 # Note: install `scikit-learn`, not the deprecated `sklearn` stub on PyPI.
 # torch 2.2.2 is the last version with Intel-macOS (x86_64) CPU wheels.
-pip install "torch==2.2.2" "pandas==1.5.3" "numpy==1.26.4" scikit-learn
+pip install "torch==2.2.2" "pandas==2.3.3" "numpy==1.26.4" scikit-learn
 
 # Deactivate the environment when you are done with the analyses
 conda deactivate
 ```
+
+For the v2 AnnData/AIRR integration work, an isolated Scirpy compatibility environment is
+also recorded in `environment-scirpy022.yml`:
+
+```{shell}
+conda env create -f environment-scirpy022.yml
+conda activate benisse-scirpy022
+```
+
+Downloaded AIRR reference objects remain outside git. Their source, integrity hashes,
+structure, local fixture derivation, and redistribution status are recorded in
+`data/manifest.yaml`.
 
 Installation time will be about 30min, depending on the computing system
 
