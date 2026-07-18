@@ -5,6 +5,7 @@ the mathematical core independently of the Phase 4c bridge and AIRR adapter.
 """
 
 from dataclasses import dataclass
+from numbers import Integral
 
 import numpy as np
 from scipy.optimize import minimize
@@ -27,6 +28,10 @@ class UpdateAResult:
     iterations: int
     objective: float
     message: str
+    evaluations: int
+    gradient_evaluations: int
+    projected_gradient_norm: float
+    max_iterations: int
 
 
 @dataclass(frozen=True)
@@ -39,6 +44,11 @@ class ADMMResult:
     converged: bool
     graph_change_mean: float | None
     graph_change_sd: float | None
+    optimizer_results: tuple[UpdateAResult, ...]
+
+
+class OptimizationError(RuntimeError):
+    """Raised when an inner bounded optimization does not converge."""
 
 
 def _square_matrix(value, name):
@@ -57,12 +67,36 @@ def _require_same_shape(**matrices):
         raise ValueError(f"matrices must have the same shape ({details})")
 
 
+def _require_symmetric(matrix, name, tolerance=1e-12):
+    if not np.allclose(matrix, matrix.T, rtol=0, atol=tolerance):
+        raise ValueError(f"{name} must be symmetric")
+
+
+def _validate_hyperparameters(hyperparameters):
+    values = {
+        "lambda1": hyperparameters.lambda1,
+        "lambda2": hyperparameters.lambda2,
+        "gamma": hyperparameters.gamma,
+        "rho": hyperparameters.rho,
+        "m": hyperparameters.m,
+    }
+    if not all(np.isscalar(value) and np.isfinite(value) for value in values.values()):
+        raise ValueError("hyperparameters must be finite scalars")
+    if hyperparameters.lambda1 < 0 or hyperparameters.lambda2 < 0:
+        raise ValueError("lambda1 and lambda2 must be non-negative")
+    if hyperparameters.gamma <= 0 or hyperparameters.rho <= 0:
+        raise ValueError("gamma and rho must be positive")
+    if not isinstance(hyperparameters.m, Integral) or hyperparameters.m <= 0:
+        raise ValueError("m must be a positive integer")
+
+
 def graph_laplacian(weights):
     weights = _square_matrix(weights, "weights")
     return np.diag(weights.sum(axis=1)) - weights
 
 
 def update_q(identity, a_matrix, r_matrix, ls_matrix, hyperparameters):
+    _validate_hyperparameters(hyperparameters)
     identity = _square_matrix(identity, "identity")
     a_matrix = _square_matrix(a_matrix, "a_matrix")
     r_matrix = _square_matrix(r_matrix, "r_matrix")
@@ -90,6 +124,7 @@ def update_q(identity, a_matrix, r_matrix, ls_matrix, hyperparameters):
 
 
 def update_r(identity, la_matrix, r_matrix, q_matrix, ls_matrix, hyperparameters):
+    _validate_hyperparameters(hyperparameters)
     identity = _square_matrix(identity, "identity")
     la_matrix = _square_matrix(la_matrix, "la_matrix")
     r_matrix = _square_matrix(r_matrix, "r_matrix")
@@ -112,8 +147,17 @@ def update_r(identity, la_matrix, r_matrix, q_matrix, ls_matrix, hyperparameters
 
 
 def _active_coordinates(upper_bounds):
-    flat_indices = np.flatnonzero(upper_bounds.ravel(order="F") != 0)
+    active_upper_triangle = np.triu(upper_bounds != 0, k=1)
+    flat_indices = np.flatnonzero(active_upper_triangle.ravel(order="F"))
     return np.unravel_index(flat_indices, upper_bounds.shape, order="F")
+
+
+def _symmetric_candidate(parameters, active_coordinates, shape):
+    candidate = np.zeros(shape, dtype=np.float64)
+    rows, columns = active_coordinates
+    candidate[rows, columns] = parameters
+    candidate[columns, rows] = parameters
+    return candidate
 
 
 def _a_terms(
@@ -127,8 +171,7 @@ def _a_terms(
     ls_matrix,
     hyperparameters,
 ):
-    candidate = np.zeros(shape, dtype=np.float64)
-    candidate[active_coordinates] = parameters
+    candidate = _symmetric_candidate(parameters, active_coordinates, shape)
     la_matrix = graph_laplacian(candidate)
     residual = (
         la_matrix
@@ -151,13 +194,35 @@ def _a_terms(
         ** 2
         + np.sum(candidate * phi)
     )
-    # R recycles the vector returned by ``diag(U)`` down every matrix column in
-    # ``-U-t(U)+2*diag(U)``. Broadcasting the diagonal as a column reproduces
-    # that behavior; constructing a diagonal matrix would change the optimizer.
-    gradient_matrix = 2 * phi + 16 * hyperparameters.rho * hyperparameters.gamma**2 * (
-        -residual - residual.T + 2 * np.diag(residual)[:, None]
+    rows, columns = active_coordinates
+    diagonal = np.diag(residual)
+    gradient = 2 * phi[rows, columns] + (
+        16
+        * hyperparameters.rho
+        * hyperparameters.gamma**2
+        * (
+            diagonal[rows]
+            + diagonal[columns]
+            - residual[rows, columns]
+            - residual[columns, rows]
+        )
     )
-    return objective, gradient_matrix[active_coordinates]
+    return objective, gradient
+
+
+def _optimizer_options(problem_size):
+    return {
+        "maxiter": 50 if problem_size > 1000 else 100,
+        "ftol": 1e7 * np.finfo(np.float64).eps,
+        "gtol": 1e-8,
+        "maxcor": 5,
+        "maxls": 20,
+    }
+
+
+def _projected_gradient_norm(parameters, gradient, lower, upper):
+    projected = parameters - np.clip(parameters - gradient, lower, upper)
+    return float(np.linalg.norm(projected, ord=np.inf)) if projected.size else 0.0
 
 
 def update_a(
@@ -170,6 +235,7 @@ def update_a(
     ls_matrix,
     hyperparameters,
 ):
+    _validate_hyperparameters(hyperparameters)
     phi = _square_matrix(phi, "phi")
     si_matrix = _square_matrix(si_matrix, "si_matrix")
     identity = _square_matrix(identity, "identity")
@@ -186,6 +252,16 @@ def update_a(
         q_matrix=q_matrix,
         ls_matrix=ls_matrix,
     )
+    for matrix, name in (
+        (phi, "phi"),
+        (si_matrix, "si_matrix"),
+        (identity, "identity"),
+        (a_matrix, "a_matrix"),
+        (r_matrix, "r_matrix"),
+        (q_matrix, "q_matrix"),
+        (ls_matrix, "ls_matrix"),
+    ):
+        _require_symmetric(matrix, name)
 
     upper_bounds = hyperparameters.lambda1 * (1 - identity) * si_matrix
     active_coordinates = _active_coordinates(upper_bounds)
@@ -208,12 +284,18 @@ def update_a(
             iterations=0,
             objective=float(objective),
             message="No active crude-graph edges",
+            evaluations=0,
+            gradient_evaluations=0,
+            projected_gradient_norm=0.0,
+            max_iterations=_optimizer_options(a_matrix.shape[0])["maxiter"],
         )
 
     initial = a_matrix[active_coordinates]
     bounds = [(0.0, bound) for bound in upper_bounds[active_coordinates]]
 
-    def objective(parameters):
+    # scipy accepts ``(objective, gradient)`` when jac=True, avoiding duplicate
+    # construction of the dense Laplacian and residual for each evaluation.
+    def objective_and_gradient(parameters):
         return _a_terms(
             parameters,
             active_coordinates,
@@ -224,39 +306,21 @@ def update_a(
             q_matrix,
             ls_matrix,
             hyperparameters,
-        )[0]
+        )
 
-    def gradient(parameters):
-        return _a_terms(
-            parameters,
-            active_coordinates,
-            a_matrix.shape,
-            phi,
-            identity,
-            r_matrix,
-            q_matrix,
-            ls_matrix,
-            hyperparameters,
-        )[1]
-
-    max_iterations = 50 if a_matrix.shape[0] > 1000 else 100
+    options = _optimizer_options(a_matrix.shape[0])
     optimization = minimize(
-        objective,
+        objective_and_gradient,
         initial,
         method="L-BFGS-B",
-        jac=gradient,
+        jac=True,
         bounds=bounds,
-        options={
-            "maxiter": max_iterations,
-            "ftol": 1e7 * np.finfo(np.float64).eps,
-            "gtol": 0.0,
-            "maxcor": 5,
-            "maxls": 20,
-        },
+        options=options,
     )
-    updated = np.zeros_like(a_matrix)
-    updated[active_coordinates] = optimization.x
-    updated = (updated + updated.T) / 2
+    updated = _symmetric_candidate(optimization.x, active_coordinates, a_matrix.shape)
+    _, final_gradient = objective_and_gradient(optimization.x)
+    lower = np.zeros_like(optimization.x)
+    upper = upper_bounds[active_coordinates]
     return UpdateAResult(
         matrix=updated,
         success=bool(optimization.success),
@@ -264,6 +328,12 @@ def update_a(
         iterations=int(optimization.nit),
         objective=float(optimization.fun),
         message=str(optimization.message),
+        evaluations=int(optimization.nfev),
+        gradient_evaluations=int(optimization.njev),
+        projected_gradient_norm=_projected_gradient_norm(
+            optimization.x, final_gradient, lower, upper
+        ),
+        max_iterations=options["maxiter"],
     )
 
 
@@ -299,13 +369,20 @@ def run_admm(
     Input preparation remains separate so this kernel can be validated independently
     of the Phase 4c bridge and the eventual AnnData-facing data model.
     """
+    _validate_hyperparameters(hyperparameters)
     phi = _square_matrix(phi, "phi")
     si_matrix = _square_matrix(si_matrix, "si_matrix")
     ls_matrix = _square_matrix(ls_matrix, "ls_matrix")
     _require_same_shape(phi=phi, si_matrix=si_matrix, ls_matrix=ls_matrix)
-    if max_iterations < 1:
+    for matrix, name in (
+        (phi, "phi"),
+        (si_matrix, "si_matrix"),
+        (ls_matrix, "ls_matrix"),
+    ):
+        _require_symmetric(matrix, name)
+    if not isinstance(max_iterations, Integral) or max_iterations < 1:
         raise ValueError("max_iterations must be at least 1")
-    if stop_cutoff < 0:
+    if not np.isscalar(stop_cutoff) or not np.isfinite(stop_cutoff) or stop_cutoff < 0:
         raise ValueError("stop_cutoff must be non-negative")
 
     identity = np.eye(si_matrix.shape[0], dtype=np.float64)
@@ -317,6 +394,7 @@ def run_admm(
     change_mean = None
     change_sd = None
     converged = False
+    optimizer_results = []
 
     for iteration in range(1, max_iterations + 1):
         iteration_hyper = HyperParameters(
@@ -337,7 +415,7 @@ def run_admm(
             ls_matrix,
             iteration_hyper,
         )
-        a_matrix = update_a(
+        optimizer_result = update_a(
             phi,
             si_matrix,
             identity,
@@ -346,7 +424,14 @@ def run_admm(
             q_matrix,
             ls_matrix,
             iteration_hyper,
-        ).matrix
+        )
+        if not optimizer_result.success:
+            raise OptimizationError(
+                f"A optimization failed at ADMM iteration {iteration}: "
+                f"status={optimizer_result.status}, message={optimizer_result.message}"
+            )
+        optimizer_results.append(optimizer_result)
+        a_matrix = optimizer_result.matrix
         rho *= 2 / (1 + np.sqrt(5))
 
         sparse_graph = a_matrix > 0
@@ -376,4 +461,5 @@ def run_admm(
         converged=converged,
         graph_change_mean=change_mean,
         graph_change_sd=change_sd,
+        optimizer_results=tuple(optimizer_results),
     )

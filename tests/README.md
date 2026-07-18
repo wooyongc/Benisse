@@ -11,9 +11,11 @@ conda run -n benisse-scirpy022 python -m pytest -v
 
 The fast suite checks the callable encoder contract, duplicate and disjoint multi-file input,
 input-order invariance, every committed reference hash, the corrected convergence norm, and
-scientific invariants of the R oracle. Phase 4d also compares each NumPy/SciPy numerical
-kernel with an R-generated golden fixture, including the `n > 1000` L-BFGS-B branch. It runs
-entirely on CPU; the full pipeline test is skipped unless explicitly enabled.
+scientific invariants of the R oracle. Phase 4d adds small corrected-R fixtures for each
+NumPy/SciPy kernel, finite-difference gradient checks, optimizer-status enforcement, a complete
+four-node ADMM comparison, permutation and alternate-hyperparameter cases, and a configuration
+test for the `n > 1000` optimizer branch without allocating a large matrix. It runs entirely
+on CPU; cohort-scale validation of the experimental Python core is deferred.
 
 Regenerate and inspect the Phase 4d component oracle with:
 
@@ -22,13 +24,14 @@ Rscript tests/fixtures/generate_r_core_golden.R tests/fixtures/r_core_golden.jso
 conda run -n benisse-scirpy022 python -m pytest tests/test_python_r_core.py -v
 ```
 
-Run the complete Python + R oracle check explicitly:
+Run the complete **legacy R pipeline** oracle check explicitly:
 
 ```sh
 BENISSE_RUN_SLOW_TESTS=1 conda run -n benisse-scirpy022 python -m pytest -m slow -v
 ```
 
-The complete check takes several minutes. Stable CSV/text outputs are compared byte-for-byte,
+This check does not validate the experimental Python core. It takes several minutes; stable
+CSV/text outputs are compared byte-for-byte,
 `Benisse_results.RData` is compared semantically with exact sparse-edge agreement, and PDF
 plots are rasterized with `pdftoppm` before byte comparison so timestamps do not cause false
 failures.

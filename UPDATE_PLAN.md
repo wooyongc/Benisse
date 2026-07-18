@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phases 4c and 4d active in parallel; Phase 4b audit merged
+Status: LIVING PLAN — Phase 4c active; Phase 4d small-fixture scope complete
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -44,30 +44,31 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | Phase 4a parity harness/internal modularization | **DONE; audit merged** | PR #18 added direct convergence cancellation coverage, true multi-file/order metamorphic cases, encoder schema checks, hash-ledger completeness, and R scientific invariants. |
 | Phase 4b AnnData/AIRR I/O | **DONE; audit hardened** | PR #17 added the contract and PR #19 merged its fresh-context hardening into `develop/v2-modernization` at `ac52d61`. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
 | Phase 4c Python→R bridge | **ACTIVE — Claude Code** | Being developed concurrently against the merged AIRR adapter; keep bridge/schema integration out of the 4d numerical branch. |
-| Phase 4d R-core port | **ACTIVE — `feat/python-r-core-port`** | NumPy/SciPy kernels and ADMM controller implemented independently of 4c. Fast R-golden component gate passes; full 1,494-clone oracle converges at iteration 33 with one undirected support-edge difference (Jaccard 0.999408983452), now bounded explicitly in the slow gate. |
+| Phase 4d R-core port | **EXPERIMENTAL CORE DONE; FULL-SCALE VALIDATION DEFERRED** | Correct symmetric-edge NumPy/SciPy kernels and ADMM controller are verified against a corrected test-only R oracle on deterministic 4–8-node cases. Optimizer failures are fatal. No cohort-scale equivalence is claimed; Phase 4c remains the supported execution path. |
 | Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
 | Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
 | Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
 
 ### Work log
 
-- **2026-07-18 — Phase 4d numerical core active (`feat/python-r-core-port`).** Ported the
-  graph Laplacian, `Q`, `R`, bounded `A`, latent-distance, corrected convergence, and ADMM
-  controller kernels to NumPy/SciPy without coupling them to Claude Code's concurrent Phase 4c
-  bridge. Added a deterministic R-authored JSON component oracle, including the `n > 1000`
-  optimizer branch, plus a dynamic binary exporter for the committed 1,494-clone example.
-  Component result: 6 passed, 1 slow skipped in 0.68s, with linear-algebra parity at
-  approximately `5e-15` and
-  bounded-update parity within `1e-12`. Three full diagnostic runs reproduced convergence at
-  iteration 33; a one-iteration controller fixture confirms exact `Q`/`R` and edge support but
-  exposes up to 0.0284 early `A`-weight path drift. SciPy and R's L-BFGS-B implementations
-  differ on one undirected final support edge:
-  3,384 versus 3,382 directed entries, two mismatched entries, Jaccard 0.999408983452. On the
-  shared support, one further undirected edge differs by at most 0.00239916 (0.36%); all other
-  entries agree within `1e-8`. The slow gate encodes these narrowly bounded exceptions instead
-  of misreporting exact parity. Final 4d integration with the Phase 4c result object remains
-  pending after both topic branches merge. Combined fast result on the audited 4b base:
-  44 passed, 2 slow skipped in 11.43s.
+- **2026-07-18 — Phase 4d corrected small-fixture scope (`feat/python-r-core-port`).** A
+  fresh-context audit found that the first directed-coordinate translation supplied an
+  inconsistent Jacobian to SciPy, silently accepted `ABNORMAL` L-BFGS-B exits, and therefore
+  could report ADMM convergence after failed inner solves. Replaced it with one variable per
+  undirected upper-triangle edge and the paper's mathematically corresponding symmetric-edge
+  gradient. `A` is now symmetric by construction, objective and Jacobian share one dense
+  evaluation, solver metadata is retained, and any failed inner solve aborts ADMM. Replaced
+  the legacy optimizer fixture with a corrected test-only R oracle and added central finite
+  differences, successful-solver/KKT checks, exact small corrected-R comparisons, a complete
+  four-node ADMM run, permutation equivariance, an eight-node alternate case, empty-graph and
+  invalid-input cases, and allocation-free verification of the `n > 1000` policy. Production
+  `R/update.R`, committed example outputs, and hashes are unchanged. The earlier 1,494-node
+  diagnostics are retained only as audit history and are **not** evidence for the corrected
+  algorithm. Full-example/cohort-scale scientific equivalence is deferred due to available
+  compute and data bandwidth; the Python module remains internal/experimental, Phase 4c is the
+  supported execution path, and R retirement is not authorized. Verification: corrected
+  fixture regeneration is byte-identical; Phase 4d focused suite 19 passed in 0.63s; combined
+  fast suite 57 passed, 1 legacy slow test skipped in 12.57s.
 - **2026-07-18 — Phase 4b audit/hardening merged.** PR #18 merged the independent Phase 4a
   parity audit (`7fe8f7c`), and PR #19 merged Claude Code's AIRR adapter hardening (`44bff80`)
   into `develop/v2-modernization` at `ac52d61`. Phase 4c and the isolated Phase 4d numerical
@@ -298,15 +299,14 @@ than designing the packaging from scratch.
   wrapper around the UNMODIFIED `Benisse.R`, so users get end-to-end Python UX without
   betting correctness on an unproven port. Treat this as an internal/scientific interface;
   defer the polished public CLI.
-- **ACTIVE — 4d R-core port.** Port the R core to Python against the R oracle behind a strengthened parity
-  gate: assert **discrete edge-set agreement** on `sparse_graph` (e.g. exact/near-exact
-  Jaccard on edge sets), NOT only elementwise tolerance on `latent_dist.txt` — because
-  `A>0` thresholding (`util.R:26-27`) means sub-tolerance drift can flip edges. The
-  `util.R:38` convergence bug is resolved in the oracle: implement the corrected
-  `sum(delta^2)/n^2` definition. Component kernels require tight numerical parity. The full
-  reference currently has one undirected L-BFGS-B boundary-edge difference (Jaccard
-  0.999408983452), so retain a narrowly bounded near-exact gate and do not describe the port
-  as exact until/unless that optimizer-specific difference is eliminated.
+- **EXPERIMENTAL — 4d R-core port; small-fixture scope complete, scale validation deferred.**
+  The Python core uses the mathematically correct symmetric-edge parameterization and is tested
+  against a corrected, test-only R implementation on small deterministic cases. Component
+  kernels require explicit tight tolerances, every inner optimizer must report success, and
+  scientific invariants and node-order equivariance are enforced. Full example/cohort edge-set,
+  latent-geometry, and downstream biological equivalence remain unverified and must not be
+  inferred from the component tests. Do not switch the default execution path or retire R until
+  compute and representative data are available for that work.
   **Why port ADMM rather than replace it:** the ADMM sparse-graph is the differentiator —
   convex, interpretable, and it guarantees the learned graph is a strict sparse subset of the
   crude graph (`benisse_context.md` §5). BiGCN's GCN fusion (`bigcn_context.md`) is a known
@@ -540,10 +540,11 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork +
 Phase 4a scientific parity harness and callable encoder boundary.
 
-**ACTIVE:** 4c (internal subprocess/R bridge) and the independent 4d numerical port are
-proceeding in parallel from the audited 4b base. Merge and test their result-object integration,
-then proceed to Phase 2 Python plots → 4e (package,
-public CLI, CI, tutorial, migration notes, Seurat bridge, and R-stage retirement) → competitive
+**ACTIVE:** finish 4c (internal subprocess/R bridge) as the supported execution path. The 4d
+mathematical core has completed its small-fixture scope but remains experimental pending
+full-scale validation; result-schema integration must not make it the default. Then proceed to
+Phase 2 Python plots against the 4c result object → 4e (package,
+public CLI, CI, tutorial, migration notes, and Seurat bridge) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
 and tag v2 only after the release gates below pass. Coordinate the remaining large-asset move
 and one history rewrite before that release; the in-house cohort file is already absent from
@@ -554,6 +555,7 @@ the active tree and its historical blob should be removed in that rewrite.
 - Fresh environment install succeeds on supported CPU platforms.
 - Packaged encoder and AnnData/AIRR round-trip tests pass on the deterministic fixture.
 - Python-facing end-to-end workflow reproduces the R oracle's discrete sparse edge set.
+- Experimental Python core remains non-default unless full-scale equivalence is later validated.
 - Large-file location, Zenodo/DOI implications, and human-subject data governance are resolved
   and documented.
 - CI smoke tests, user tutorial, migration notes, and license/redistribution statements pass
