@@ -181,6 +181,25 @@ After the R script has been run, it will output the following files:
 
 The runtime on our example dataset should be <30min for both steps combined
 
+## Scientific parity tests
+
+The Phase 4 modernization is guarded by a pytest suite. Run the fast CPU checks with:
+
+```{shell}
+conda run -n benisse-scirpy022 python -m pytest -v
+```
+
+Run the explicit full Python + R oracle check with:
+
+```{shell}
+BENISSE_RUN_SLOW_TESTS=1 conda run -n benisse-scirpy022 \
+  python -m pytest -m slow -v -s
+```
+
+The slow check compares the encoded CSV and stable R outputs byte-for-byte, compares the
+RData result semantically with exact sparse-edge agreement, and compares rasterized PDF pages.
+See `tests/README.md` for details.
+
 
 ## Version update
 1.0.0: First release. (Nov 17th, 2021)

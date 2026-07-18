@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 4a parity harness is next
+Status: LIVING PLAN — Phase 4a complete; Phase 4b AnnData/AIRR I/O is next
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -41,8 +41,8 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
 | Large-file/history cleanup | **PENDING** | Coordinate the remaining asset migration and one repository-wide history rewrite later; document Zenodo/DOI implications first. |
 | In-house cohort data | **DONE in active tree; history pending** | Archived on the existing Figshare record and removed from the repository tree at the maintainer's direction; remove its old blob during the coordinated history rewrite. |
-| Phase 4a parity harness/internal modularization | **PENDING — NEXT** | Add scientific parity tests and reusable internal functions without promising a public package API. |
-| Phase 4b AnnData/AIRR I/O | **PENDING; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
+| Phase 4a parity harness/internal modularization | **DONE** | Pytest: 4 fast checks pass; the marked full Python+R oracle passes with exact encoder/text bytes, semantic RData equality, 3,382 exact sparse entries, and pixel-identical plots. |
+| Phase 4b AnnData/AIRR I/O | **PENDING — NEXT; groundwork ready** | Define Benisse↔AIRR field mapping and use the AP4 fixture for tests. |
 | Phase 4c Python→R bridge | **PENDING** | Follows 4b and provides an end-to-end Python-facing scientific harness. |
 | Phase 4d R-core port | **PENDING** | Compare against the corrected R oracle with exact edge-set checks. |
 | Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
@@ -51,6 +51,14 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 
 ### Work log
 
+- **2026-07-18 — Phase 4a scientific parity harness
+  (`test/scientific-parity-harness`).** Extracted a callable `encode_bcr` boundary while
+  preserving the legacy CLI. Added pytest coverage for CLI boolean parsing, exact callable
+  encoder output, duplicate multi-file input, and the committed reference-hash ledger. Added
+  an explicitly enabled slow pytest that runs both pipeline stages in a temporary directory,
+  byte-compares stable outputs, checks semantic RData and exact sparse-edge agreement, and
+  raster-compares PDFs. Fast result: 4 passed, 1 slow skipped. Full oracle: 1 passed in
+  11m32s; iteration 33, exact sparse matrix entries = 3,382.
 - **2026-07-18 — in-house cohort archival.** The maintainer confirmed that
   `data/in-house_cohort_BCR_data.csv` was a reviewer-requested publication artifact and moved
   it to the existing Benisse Figshare record. Removed it from the active repository tree
@@ -61,8 +69,9 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
   plots. Early Python work is limited to parity tests and the internal modular boundaries
   required by those scientific tasks. Large migrated assets will be published to both Figshare
   and a GitHub Release and removed from existing Git history; the Zenodo/DOI impact must be
-  documented before rewriting. The in-house cohort CSV will remain in both the tree and
-  history with explicit provenance/governance documentation.
+  documented before rewriting. The initial decision to retain the in-house cohort was
+  superseded later the same day after its Figshare archival was confirmed; it is now absent
+  from the active tree and awaits historical removal.
 - **2026-07-18 — Phase 1 completion (`fix/convergence-reproducibility`).** Fixed the
   convergence norm in `R/util.R`; the corrected full pipeline still converged at iteration
   33 with an identical sparse edge set and numerical results. Added a checked-in SHA-256
@@ -227,9 +236,9 @@ a **working template** for exactly this design (AnnData/scirpy-native, `adata.ob
 `mvtcr`, scArches reference mapping — `mvtcr_context.md`); study it as prior art for 4b/4e rather
 than designing the packaging from scratch.
 
-- 4a — Scientific parity harness + minimal internal modularization. Add automated checks for
+- **DONE — 4a scientific parity harness + minimal internal modularization.** Added automated checks for
   exact encoder output, stable R text outputs, semantic RData equality, rendered-plot parity,
-  and exact sparse edge-set agreement. Extract only the callable internal encoder boundaries
+  and exact sparse edge-set agreement. Extracted only the callable internal encoder boundaries
   needed by tests and later adapters. Do **not** publish a package, promise a public Python API,
   redesign the CLI, or rearrange model assets yet.
 - 4b — AnnData/AIRR I/O: read/write `.h5ad`/`.h5mu`; embeddings into `adata.obsm`.
@@ -481,10 +490,10 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 - Output: a positioning subsection for the revived README / release notes.
 
 ## Sequencing summary (living)
-**DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork.
+**DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork +
+Phase 4a scientific parity harness and callable encoder boundary.
 
-**NEXT:** proceed through 4a (parity harness and minimal internal modularization) → 4b
-(AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
+**NEXT:** proceed through 4b (AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
 → 4d (Python port behind the exact edge-set parity gate) → Phase 2 Python plots → 4e (package,
 public CLI, CI, tutorial, migration notes, Seurat bridge, and R-stage retirement) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
