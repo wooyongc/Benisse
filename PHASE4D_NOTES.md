@@ -1,9 +1,9 @@
 # Phase 4d corrected Python numerical core — validation notes
 
-Status: **internal and experimental; not the default execution path**. The corrected
-NumPy/SciPy port is mathematically and numerically hardened, but it intentionally differs from
-the legacy R optimizer on some graph edges. Phase 4c's R bridge remains the supported path until
-the maintainer makes an explicit migration decision.
+Status: **adopted as corrected v2 behavior and the default internal execution path**. The
+NumPy/SciPy core is mathematically and numerically hardened and intentionally differs from the
+legacy R optimizer on some graph edges. The remaining R preprocessing/initialization dependency
+has now been removed; see `PHASE4_NATIVE_NOTES.md`. Public packaging is still deferred.
 
 ## Audit hardening completed
 

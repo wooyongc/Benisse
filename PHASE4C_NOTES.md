@@ -1,14 +1,15 @@
 # Phase 4c Python→R bridge — status and open interface assumptions
 
-Status: merged by PR #21 into `develop/v2-modernization` at `0ceb21e`. This is the
-supported interim Python→R bridge around `Benisse.R` and builds on the hardened
-Phase 4b schema (PR #19). No public/scverse package or CLI yet (that is 4e).
+Status: merged by PR #21 into `develop/v2-modernization` at `0ceb21e`, then superseded as
+the default by the corrected R-free v2 pipeline. This Python→R bridge is retained as the
+frozen v1/paper oracle and migration aid; it is not a v2 runtime dependency. No public package
+or CLI exists yet.
 
 Phase 4d now reuses this result schema for corrected-core validation. A narrowly scoped
 production fix prevents `post_analysis.R::testCor` from selecting a zero bin size on graphs
 with fewer than 50 directed edge entries. It does not change the numerical R core. Real-data
-validation shows that the corrected Python graph can prune legacy R edges, so this R bridge
-remains the default rather than treating the two implementations as silently interchangeable.
+validation shows that corrected Python can prune legacy R edges; this is now an intentional,
+tested v2 migration rather than silent interchangeability.
 
 ## What was delivered
 
@@ -49,7 +50,7 @@ remains the default rather than treating the two implementations as silently int
   as `A` (initiation.R reindexes distances back to `meta_dedup$clone` order).
 - Reference `example/` run: 1494 nodes, 1691 undirected edges, weights [0.5, 1.0].
 
-## Deferred: the MuData→R-inputs prep (the fragile part)
+## Superseded deferral: MuData→R-input preparation
 
 `run_pipeline` takes the three standard Benisse CSVs. Building `exp.csv` and
 `contigs.csv` **from a MuData/AIRR object** was deliberately deferred, because it
@@ -71,6 +72,10 @@ public-API decisions. Specifics discovered, for whoever implements it:
   reproduce R's max-umi pick in Python.
 - Once implemented, wire `airr_adapter.attach_network_result(mdata, result)` so
   the MuData-native call returns the network in `uns`.
+
+These questions are resolved for v2 by `benisse_preprocessing.py` and
+`benisse_pipeline.run_mudata_pipeline`: the audited AIRR productive-heavy selection is the
+accepted input contract, results attach to `uns`, and the runtime does not generate R inputs.
 
 ## Coordination with Phase 4d (Codex, in parallel)
 

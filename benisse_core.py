@@ -1,7 +1,7 @@
-"""Internal NumPy/SciPy port of the Benisse R numerical kernels.
+"""Corrected NumPy/SciPy numerical core for Benisse v2.
 
-This module is intentionally not a public API. Phase 4d develops and verifies
-the mathematical core independently of the Phase 4c bridge and AIRR adapter.
+This remains an internal API until packaging, but it is the default v2 runtime
+core. Historical R is retained only as a frozen scientific oracle.
 """
 
 from dataclasses import dataclass
@@ -366,8 +366,8 @@ def run_admm(
 ):
     """Run the numerical loop in ``R/util.R::Benisse`` from initialized matrices.
 
-    Input preparation remains separate so this kernel can be validated independently
-    of the Phase 4c bridge and the eventual AnnData-facing data model.
+    Input preparation remains separate so the kernel can be validated independently;
+    ``benisse_pipeline`` supplies the R-free CSV and MuData-facing workflow.
     """
     _validate_hyperparameters(hyperparameters)
     phi = _square_matrix(phi, "phi")

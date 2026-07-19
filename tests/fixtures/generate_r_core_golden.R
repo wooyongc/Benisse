@@ -87,6 +87,45 @@ run_small_admm=function(max_iter=30,stop_cutoff=1e-10){
   )
 }
 
+run_legacy_admm=function(max_iter=30,stop_cutoff=1e-10){
+  current_hyper=hyper
+  A=current_hyper$lambda1*(1-I)*SI
+  Q=R=SI
+  history=list()
+  converged=FALSE
+  change_mean=NA
+  change_sd=NA
+  for(iteration in seq_len(max_iter)){
+    q_result=update_Q(I,A,R,Q,LS,current_hyper)
+    Q=q_result$Q
+    R=update_R(I,q_result$LA,R,Q,LS,current_hyper)
+    # Frozen production-R behavior: directed coordinates, mismatched gradient,
+    # ignored optim status, and post-hoc symmetrization.
+    A=update_A(
+      matrix(0,n,n),phi,data.frame(node=seq_len(n)),SI,I,A,R,Q,LS,current_hyper
+    )
+    current_hyper$rho=current_hyper$rho*2/(1+sqrt(5))
+    sparse=A>0
+    history=append(history,list(sparse))
+    if(length(history)>11) history=history[-1]
+    if(iteration>10){
+      changes=sapply(seq_len(10),function(index){
+        sum((history[[index+1]]-history[[index]])^2)/n^2
+      })
+      change_mean=mean(changes)
+      change_sd=sd(changes)
+      if(change_mean<stop_cutoff&&change_sd<1e-4){
+        converged=TRUE
+        break
+      }
+    }
+  }
+  list(
+    A=A,sparse_graph=sparse,iterations=iteration,converged=converged,
+    graph_change_mean=change_mean,graph_change_sd=change_sd
+  )
+}
+
 fixture=list(
   schema_version=2,
   generated_with=list(
@@ -111,7 +150,8 @@ fixture=list(
       Q=loop_q_result$Q,R=loop_R,A=loop_A_result$A,
       optimizer_convergence=loop_A_result$convergence
     ),
-    admm=run_small_admm()
+    admm=run_small_admm(),
+    legacy_production_gap=run_legacy_admm()
   )
 )
 

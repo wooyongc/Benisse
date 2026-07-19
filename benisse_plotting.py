@@ -24,6 +24,7 @@ from sklearn.decomposition import PCA
 
 import airr_adapter as aa
 import benisse_bridge as bridge
+from benisse_preprocessing import clone_expression_distances as _clone_expression_distances
 
 
 DISTANCE_LABELS = (
@@ -217,56 +218,8 @@ def edge_retention_ratio(data: BenissePlotData) -> float:
 
 
 def clone_expression_distances(cleaned_exp, clonality_labels, node_ids) -> np.ndarray:
-    """Reproduce ``initiation.R``'s clone-level expression-distance matrix.
-
-    ``cleaned_exp`` is genes x cells and ``clonality_labels`` has one clone key
-    per cell. The calculation selects the most variable expression decile,
-    performs the same unscaled 10-PC projection, sums cell distances by clone,
-    and applies the legacy normalization.
-    """
-    if isinstance(cleaned_exp, (str, Path)):
-        expression = pd.read_csv(cleaned_exp, sep=r"\s+", index_col=0)
-    else:
-        expression = pd.DataFrame(cleaned_exp).copy()
-    if isinstance(clonality_labels, (str, Path)):
-        labels = pd.read_csv(clonality_labels, header=None).iloc[:, 0].astype(str).to_numpy()
-    else:
-        labels = np.asarray(clonality_labels, dtype=str)
-    values = expression.to_numpy(dtype="float64")
-    if values.ndim != 2 or values.shape[1] != labels.size:
-        raise ValueError("expression columns and clonality labels must have equal length")
-    if labels.size < 2 or not np.isfinite(values).all():
-        raise ValueError("expression data require at least two finite cells")
-    deviations = np.std(values, axis=1, ddof=1)
-    keep = deviations > np.quantile(deviations, 0.9)
-    if np.count_nonzero(keep) < 1:
-        raise ValueError("no genes remain after variable-gene selection")
-    cell_matrix = values[keep].T
-    n_components = min(10, cell_matrix.shape[0], cell_matrix.shape[1])
-    scores = PCA(n_components=n_components, svd_solver="full").fit_transform(cell_matrix)
-    cell_distances = squareform(pdist(scores))
-
-    unique_labels = np.asarray(sorted(set(labels)))
-    indicator = sparse.csr_matrix(
-        (
-            np.ones(labels.size),
-            (np.arange(labels.size), np.searchsorted(unique_labels, labels)),
-        ),
-        shape=(labels.size, unique_labels.size),
-    )
-    aggregated = np.asarray(indicator.T @ cell_distances @ indicator)
-    scaler = 4 * aggregated.sum() / (labels.size * (labels.size - 1))
-    if scaler <= 0 or not np.isfinite(scaler):
-        raise ValueError("expression-distance scaling is zero or non-finite")
-    clone_sizes = np.asarray(indicator.sum(axis=0)).ravel()
-    normalized = aggregated / clone_sizes[:, None] / clone_sizes[None, :] / scaler
-    positions = {name: i for i, name in enumerate(unique_labels)}
-    missing = [name for name in node_ids if name not in positions]
-    if missing:
-        raise ValueError(f"clonality labels are missing {len(missing)} graph nodes")
-    order = np.asarray([positions[name] for name in node_ids])
-    result = normalized[np.ix_(order, order)]
-    return (result + result.T) / 2
+    """Backward-compatible plotting alias for the preprocessing calculation."""
+    return _clone_expression_distances(cleaned_exp, clonality_labels, node_ids)
 
 
 def bcr_embedding_distances(embedding) -> np.ndarray:
@@ -458,12 +411,15 @@ def plot_coupling_correlation(reduced: pd.DataFrame, correlations: dict[str, flo
     return ax
 
 
-def generate_post_analysis_plots(out_dir, encoded_csv, destination=None) -> dict[str, Path]:
-    """Generate Python PDFs from a standard completed Benisse output directory."""
-    out_dir = Path(out_dir)
-    destination = Path(destination) if destination else out_dir
+def generate_plots(
+    data: BenissePlotData,
+    destination,
+    *,
+    expression_distances=None,
+) -> dict[str, Path]:
+    """Generate Python PDFs directly from an in-memory pipeline result."""
+    destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
-    data = read_plot_data(out_dir, encoded_csv=encoded_csv)
     generated = {}
     for key, plotter in (
         ("connection", plot_embedding_network),
@@ -476,12 +432,9 @@ def generate_post_analysis_plots(out_dir, encoded_csv, destination=None) -> dict
         plt.close(plt.gcf())
         generated[key] = path
 
-    cleaned = out_dir / bridge.OUTPUT_FILES["cleaned_exp"]
-    clonality = out_dir / bridge.OUTPUT_FILES["clonality_label"]
-    if cleaned.exists() and clonality.exists():
-        expression = clone_expression_distances(cleaned, clonality, data.network.node_ids)
+    if expression_distances is not None:
         reduced, correlations = coupling_data(
-            expression,
+            expression_distances,
             data.latent_distances,
             bcr_embedding_distances(data.embedding),
             data.network,
@@ -492,3 +445,16 @@ def generate_post_analysis_plots(out_dir, encoded_csv, destination=None) -> dict
         plt.close(plt.gcf())
         generated["coupling"] = path
     return generated
+
+
+def generate_post_analysis_plots(out_dir, encoded_csv, destination=None) -> dict[str, Path]:
+    """Generate Python PDFs from a standard completed Benisse output directory."""
+    out_dir = Path(out_dir)
+    destination = Path(destination) if destination else out_dir
+    data = read_plot_data(out_dir, encoded_csv=encoded_csv)
+    cleaned = out_dir / bridge.OUTPUT_FILES["cleaned_exp"]
+    clonality = out_dir / bridge.OUTPUT_FILES["clonality_label"]
+    expression = None
+    if cleaned.exists() and clonality.exists():
+        expression = clone_expression_distances(cleaned, clonality, data.network.node_ids)
+    return generate_plots(data, destination, expression_distances=expression)
