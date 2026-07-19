@@ -99,10 +99,16 @@ testCor=function(master_dist_e,Q,t,sparse_graph,hyper_para,target_points=300){
   a=as.vector(master_dist_e[sparse_graph==1])
   b=as.vector(latent_dist[sparse_graph==1])
   c=as.vector(real_dist[sparse_graph==1])
+  if(length(a)==0){
+    return(list(c1=NA_real_,c2=NA_real_))
+  }
   group_size=floor(length(a)/target_points)
   if(group_size<5){
     group_size=floor(length(a)/50)
   }
+  # Small/sparse graphs can have fewer than 50 directed edges. Keep aggregation
+  # valid instead of dividing by a zero group size in the sequence below.
+  group_size=max(1,group_size)
   aggrlist=rep(c(1:floor(length(a)/group_size)),each=group_size)
   aggrlist=c(aggrlist,rep(aggrlist[length(aggrlist)],(length(a)-length(aggrlist))))
   b=b[order(a,decreasing = F)]
@@ -118,4 +124,3 @@ testCor=function(master_dist_e,Q,t,sparse_graph,hyper_para,target_points=300){
   }
   return(list(c1=cor(a,b,method='spearman'),c2=cor(a,c,method='spearman')))
 }
-

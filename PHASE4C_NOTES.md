@@ -1,8 +1,14 @@
 # Phase 4c Python→R bridge — status and open interface assumptions
 
-Status: interim Python→R bridge around the **unmodified** `Benisse.R`,
-implemented and tested. Builds on the hardened Phase 4b schema (PR #19). No
-public/scverse package or CLI yet (that is 4e); the Python core port is 4d.
+Status: merged by PR #21 into `develop/v2-modernization` at `0ceb21e`. This is the
+supported interim Python→R bridge around `Benisse.R` and builds on the hardened
+Phase 4b schema (PR #19). No public/scverse package or CLI yet (that is 4e).
+
+Phase 4d now reuses this result schema for corrected-core validation. A narrowly scoped
+production fix prevents `post_analysis.R::testCor` from selecting a zero bin size on graphs
+with fewer than 50 directed edge entries. It does not change the numerical R core. Real-data
+validation shows that the corrected Python graph can prune legacy R edges, so this R bridge
+remains the default rather than treating the two implementations as silently interchangeable.
 
 ## What was delivered
 

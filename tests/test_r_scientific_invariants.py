@@ -72,3 +72,29 @@ stopifnot(isTRUE(all.equal(sparse, A, check.attributes=FALSE)))
 stopifnot(all((sparse > 0) == (results$sparse_graph == 1)))
 """
     )
+
+
+@pytest.mark.skipif(RSCRIPT is None, reason="Rscript is required for R component checks")
+def test_post_analysis_handles_graphs_with_fewer_than_fifty_directed_edges():
+    run_r(
+        """
+source('R/post_analysis.R')
+n <- 4
+Q <- diag(n)
+t <- matrix(c(0,0, 1,0, 0,1, 1,1), nrow=n, byrow=TRUE)
+master <- as.matrix(dist(t))
+sparse <- matrix(0, nrow=n, ncol=n)
+sparse[1,2] <- sparse[2,1] <- 1
+result <- testCor(
+  master, Q, t, sparse,
+  list(lambda1=1, lambda2=1, gamma=1, rho=1, m=2)
+)
+stopifnot(is.list(result), all(c('c1','c2') %in% names(result)))
+
+empty <- testCor(
+  master, Q, t, matrix(0, nrow=n, ncol=n),
+  list(lambda1=1, lambda2=1, gamma=1, rho=1, m=2)
+)
+stopifnot(is.na(empty$c1), is.na(empty$c2))
+"""
+    )

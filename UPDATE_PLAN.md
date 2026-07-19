@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 4c active; Phase 4d small-fixture scope complete
+Status: LIVING PLAN — Phase 4c merged; Phase 4d locally validated, default decision pending
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -43,13 +43,32 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | In-house cohort data | **DONE in active tree; history pending** | Archived on the existing Figshare record and removed from the repository tree at the maintainer's direction; remove its old blob during the coordinated history rewrite. |
 | Phase 4a parity harness/internal modularization | **DONE; audit merged** | PR #18 added direct convergence cancellation coverage, true multi-file/order metamorphic cases, encoder schema checks, hash-ledger completeness, and R scientific invariants. |
 | Phase 4b AnnData/AIRR I/O | **DONE; audit hardened** | PR #17 added the contract and PR #19 merged its fresh-context hardening into `develop/v2-modernization` at `ac52d61`. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
-| Phase 4c Python→R bridge | **ACTIVE — Claude Code** | Being developed concurrently against the merged AIRR adapter; keep bridge/schema integration out of the 4d numerical branch. |
-| Phase 4d R-core port | **EXPERIMENTAL CORE DONE; FULL-SCALE VALIDATION DEFERRED** | Correct symmetric-edge NumPy/SciPy kernels and ADMM controller are verified against a corrected test-only R oracle on deterministic 4–8-node cases. Optimizer failures are fatal. No cohort-scale equivalence is claimed; Phase 4c remains the supported execution path. |
+| Phase 4c Python→R bridge | **DONE; MERGED** | PR #21 merged the standard-CSV encoder→R→`BenisseNetworkResult` bridge into `develop/v2-modernization` at `0ceb21e`; it remains the supported execution path. |
+| Phase 4d R-core port | **LOCALLY VALIDATED; DEFAULT DECISION PENDING** | Corrected kernels pass small oracles plus three complete Stephenson samples (92–427 nodes) and the 1,494-node committed NSCLC example. The port converges with successful optimizers and highly concordant latent geometry, but prunes legacy edges (up to 11/33 on AP4); do not make it default without an explicit migration decision. |
 | Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
 | Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
 | Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
 
 ### Work log
+
+- **2026-07-18 — Phase 4d guarded real-data hardening after Phase 4c merge.** Merged the
+  Phase 4c bridge (PR #21, `0ceb21e`) into `feat/python-r-core-port` and reused its shared
+  `BenisseNetworkResult` schema for comparisons. Added internal, opt-in validation that selects
+  one complete MuData sample, refuses more than 500 clone nodes by default, exports exact
+  production-R initialization matrices, and requires convergence, successful inner solves,
+  finite symmetric matrices, valid support, and positive-definite `Q`. A 94-cell validation
+  exposed a pre-existing reporting crash when `testCor` computed a zero group size; clamped it
+  to one and added a direct R regression test. Complete Stephenson samples BGCV09_CV0171,
+  AP4, and MH9143277 (92, 203, and 427 nodes) all converged in 0.09–1.62 s in the corrected
+  Python core. The committed NSCLC example (1,494 nodes) converged in 73.04 s. Corrected-vs-
+  legacy edge Jaccard was 1.000, 0.667, 0.933, and 0.941 respectively; latent-distance
+  Spearman was 0.9933–0.9985. The corrected core added no legacy-absent edges and pruned
+  0, 11, 7, and 99. This is strong local stability evidence but not silent scientific
+  equivalence: Phase 4c stays default pending a maintainer decision and migration notes.
+  The 4,833-clone multi-patient 5k object was deliberately not treated as one graph. Detailed
+  protocol and results are recorded in `PHASE4D_NOTES.md`. Verification after merging 4c:
+  78 passed, 4 explicit local/slow checks skipped in 14.77s; the focused 4c/4d/R-invariant
+  selection passed 42 with 3 explicit skips in 10.34s.
 
 - **2026-07-18 — Phase 4d corrected small-fixture scope (`feat/python-r-core-port`).** A
   fresh-context audit found that the first directed-coordinate translation supplied an
@@ -540,10 +559,11 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork +
 Phase 4a scientific parity harness and callable encoder boundary.
 
-**ACTIVE:** finish 4c (internal subprocess/R bridge) as the supported execution path. The 4d
-mathematical core has completed its small-fixture scope but remains experimental pending
-full-scale validation; result-schema integration must not make it the default. Then proceed to
-Phase 2 Python plots against the 4c result object → 4e (package,
+**NEXT DECISION:** keep the merged Phase 4c R bridge as the v2 default, or deliberately adopt
+the corrected Phase 4d Python core with scientific migration notes and regenerated reference
+expectations. Local validation establishes numerical stability but also shows real edge pruning,
+so the default must not change implicitly. After that decision, proceed to Phase 2 Python plots
+against the shared result object → 4e (package,
 public CLI, CI, tutorial, migration notes, and Seurat bridge) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
 and tag v2 only after the release gates below pass. Coordinate the remaining large-asset move
