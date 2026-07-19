@@ -120,6 +120,32 @@ def test_prepare_frames_rejects_missing_contract_and_handles_empty_candidate_gra
     assert not result.si_matrix.any()
     assert not result.ls_matrix.any()
 
+    annotation = result.annotation.copy()
+    annotation.iloc[0, annotation.columns.get_loc("v_gene")] = ""
+    with pytest.raises(ValueError, match="missing V/J calls"):
+        prep.initialize_core_inputs(
+            result.expression,
+            result.cell_clone_ids,
+            annotation,
+            result.embedding,
+            hyper,
+        )
+
+
+def test_standard_csv_pipeline_import_does_not_require_awkward():
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.modules['awkward'] = None; import benisse_pipeline; print('ok')",
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.stdout.strip() == "ok"
+
 
 @pytest.mark.skipif(RSCRIPT is None, reason="Rscript is required for frozen-preprocessing parity")
 def test_nsclc_preprocessing_matches_frozen_r_oracle(tmp_path):
@@ -217,6 +243,9 @@ def test_corrected_pipeline_writes_parseable_outputs_and_provenance(tmp_path):
     assert result.core.converged and result.core.iterations == 23
     assert result.network.provenance["implementation"] == "corrected_python_v2"
     assert result.network.provenance["runtime_requires_r"] is False
+    assert len(result.network.provenance["scientific_inputs_sha256"]) == 64
+    assert result.network.provenance["software_versions"]["numpy"] == np.__version__
+    assert result.network.provenance["code"]["revision"]
     parsed = bridge.read_benisse_network(tmp_path)
     assert parsed.node_ids == list(node_ids)
     assert set(zip(parsed.row, parsed.col)) == set(
@@ -244,17 +273,18 @@ def _chain(sequence_id, junction_aa, v_call, j_call, count):
 
 
 def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
-    cells = ["cell_A-1", "cell_B-1", "cell_C-1"]
-    airr = anndata.AnnData(np.zeros((3, 0), dtype=np.float32))
+    cells = ["cell_A-1", "cell_B-1", "cell_C-1", "cell_D-1"]
+    airr = anndata.AnnData(np.zeros((4, 0), dtype=np.float32))
     airr.obs_names = cells
     airr.obsm["airr"] = ak.Array(
         [
             [_chain("a", "CARAAW", "V1", "J1", 5)],
             [_chain("b", "CARBBW", "V2", "J2", 4)],
             [_chain("c", "CARCCW", "V3", "J3", 3)],
+            [_chain("d", "CARAAW", "V1", "J1", 2)],
         ]
     )
-    values = np.random.default_rng(7).integers(0, 20, size=(3, 12))
+    values = np.random.default_rng(7).integers(0, 20, size=(4, 12))
     gex = anndata.AnnData(sparse.csr_matrix(values))
     gex.obs_names = cells
     gex.var_names = [f"g{i}" for i in range(12)]
@@ -267,16 +297,28 @@ def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
     attached, result = pipeline.run_mudata_pipeline(
         mdata,
         tmp_path,
-        params=pipeline.BenisseParams(lambda2=3, m=2),
+        params=pipeline.BenisseParams(lambda2=4, m=2),
         generate_plots=False,
         max_nodes=5,
     )
     stored = aa.read_network_result(attached)
     assert stored.node_ids == result.network.node_ids
     assert stored.provenance["runtime_requires_r"] is False
-    assert attached.mod["airr"].obsm["X_benisse"].shape == (3, 20)
-    assert result.prepared.n_cells == 3
+    assert len(stored.provenance["encoder_model"]["sha256"]) == 64
+    assert set(stored.provenance["inputs_sha256"]) == {
+        "encoder_input_csv", "encoded_csv"
+    }
+    assert attached.mod["airr"].obsm["X_benisse"].shape == (4, 20)
+    clone_ids = attached.mod["airr"].obs["benisse_clone_id"].astype(str).tolist()
+    assert clone_ids[0] == clone_ids[3] == "V1_CARAAW_J1"
+    assert result.prepared.n_cells == 4
     assert result.prepared.n_nodes == 3
+
+    h5mu = tmp_path / "result.h5mu"
+    attached.write_h5mu(h5mu)
+    restored = mudata.read_h5mu(h5mu)
+    assert restored.mod["airr"].obs["benisse_clone_id"].astype(str).tolist() == clone_ids
+    assert aa.read_network_result(restored).node_ids == stored.node_ids
 
 
 @pytest.mark.slow

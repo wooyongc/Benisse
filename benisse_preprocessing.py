@@ -177,11 +177,15 @@ def initialize_core_inputs(
 
     master_dist_e = clone_expression_distances(expression, cell_clone_ids, node_ids)
     phi = squareform(pdist(embedding)) ** 2
-    families = (
-        annotation["v_gene"].fillna("").astype(str)
-        + "\x1f"
-        + annotation["j_gene"].fillna("").astype(str)
-    ).to_numpy()
+    v_gene = annotation["v_gene"].astype("string").str.strip()
+    j_gene = annotation["j_gene"].astype("string").str.strip()
+    incomplete = v_gene.isna() | j_gene.isna() | v_gene.eq("") | j_gene.eq("")
+    if incomplete.any():
+        raise ValueError(
+            "annotation contains missing V/J calls; incomplete calls cannot define "
+            "Benisse candidate-edge support"
+        )
+    families = (v_gene + "\x1f" + j_gene).to_numpy(dtype=str)
     si_matrix = (families[:, None] == families[None, :]).astype("float64")
     np.fill_diagonal(si_matrix, 0)
     identity = np.eye(len(node_ids), dtype="float64")

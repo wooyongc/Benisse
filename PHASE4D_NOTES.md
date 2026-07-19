@@ -32,7 +32,7 @@ encoded/reference outputs.
 | BGCV09_CV0171 | 94 | 92 | 0.09 s | 20 | 11→11 | 1.000 | 0.9933 |
 | AP4 | 203 | 203 | 0.26 s | 19 | 33→22 | 0.667 | 0.9958 |
 | MH9143277 | 437 | 427 | 1.62 s | 23 | 105→98 | 0.933 | 0.9985 |
-| Committed NSCLC example | 1,610 input labels | 1,494 | 73.04 s | 32 | 1,691→1,592 | 0.941 | 0.9981 |
+| Committed NSCLC example | 1,612 selected cells | 1,494 | 73.04 s | 32 | 1,691→1,592 | 0.941 | 0.9981 |
 
 Every corrected run converged, every inner optimizer succeeded, and every `Q` was positive
 definite. The corrected core added no edges relative to the legacy results; it retained a subset

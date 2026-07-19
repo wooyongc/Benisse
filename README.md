@@ -46,14 +46,16 @@ conda activate benisse
 # Install dependencies.
 # Note: install `scikit-learn`, not the deprecated `sklearn` stub on PyPI.
 # torch 2.2.2 is the last version with Intel-macOS (x86_64) CPU wheels.
-pip install "torch==2.2.2" "pandas==2.3.3" "numpy==1.26.4" scikit-learn
+pip install "torch==2.2.2" "pandas==2.3.3" "numpy==1.26.4" \
+  "scipy==1.15.3" "matplotlib==3.10.9" scikit-learn
 
 # Deactivate the environment when you are done with the analyses
 conda deactivate
 ```
 
-For the v2 AnnData/AIRR integration work, an isolated Scirpy compatibility environment is
-also recorded in `environment-scirpy022.yml`:
+The commands above support the standard-CSV v2 workflow and its default plots. AnnData/AIRR
+input additionally needs Awkward, AnnData, MuData, and Scirpy; use the fully pinned compatibility
+environment recorded in `environment-scirpy022.yml`:
 
 ```{shell}
 conda env create -f environment-scirpy022.yml

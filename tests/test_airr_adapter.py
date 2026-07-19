@@ -112,6 +112,32 @@ def test_heavy_selection_independent_of_chain_order():
     pd.testing.assert_frame_equal(forward, backward)
 
 
+def test_heavy_selection_rejects_missing_or_ambiguous_gene_calls_before_ranking():
+    cells = [
+        ("missing-1", [
+            _chain("IGH", "CARBAD", "bad", dup=99, v=None, j=None),
+            _chain("IGH", "CARGOOD", "good", dup=1, v="IGHV1*01", j="IGHJ2*02"),
+        ]),
+        ("ambiguous-1", [
+            _chain("IGH", "CARAMBIG", "ambig", v="IGHV1*01,IGHV2*01", j="IGHJ1"),
+        ]),
+        ("alleles-1", [
+            _chain(
+                "IGH", "CARALLELE", "alleles",
+                v="IGHV3-23*01,IGHV3-23*02", j="IGHJ4*02",
+            ),
+        ]),
+    ]
+    heavy = aa.select_heavy_chains(_airr_anndata(cells))
+
+    assert list(heavy.index) == ["missing-1", "alleles-1"]
+    assert heavy.loc["missing-1", "sequence_id"] == "good"
+    assert heavy.loc["missing-1", "v_call"] == "IGHV1"
+    assert heavy.loc["missing-1", "j_call"] == "IGHJ2"
+    assert heavy.loc["alleles-1", "v_call"] == "IGHV3-23"
+    assert heavy.loc["alleles-1", "j_call"] == "IGHJ4"
+
+
 def test_count_fallback_to_consensus_when_no_duplicate_count():
     # Two productive IGH, equal on duplicate_count; consensus is only a later
     # tiebreak, so junction_aa still decides here -- assert count coalescing

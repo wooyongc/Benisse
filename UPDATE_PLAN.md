@@ -45,7 +45,7 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | Phase 4b AnnData/AIRR I/O | **DONE; audit hardened** | PR #17 added the contract and PR #19 merged its fresh-context hardening into `develop/v2-modernization` at `ac52d61`. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
 | Phase 4c Python→R bridge | **DONE; FROZEN V1 ORACLE** | PR #21's bridge remains for paper-output reproduction and migration tests, but is no longer a v2 runtime dependency. |
 | Phase 4d corrected Python core | **DONE; V2 DEFAULT** | The finite-difference-validated symmetric-edge algorithm is the intentional v2 behavior. A dual oracle freezes the four-node v1 graph (3 edges) separately from corrected v2 (2 edges). |
-| R-free preprocessing/pipeline | **DONE; AWAITING MERGE** | Python ports `prepare.R`/`initiation.R`, runs corrected ADMM, returns/attaches `BenisseNetworkResult`, and generates plots. NSCLC and three Stephenson samples reproduce corrected expectations without R; the final combined suite passes (`95 passed, 8 skipped`). |
+| R-free preprocessing/pipeline | **DONE; AWAITING MERGE** | Python ports `prepare.R`/`initiation.R`, runs corrected ADMM, returns/attaches `BenisseNetworkResult`, and generates plots. NSCLC and three Stephenson samples reproduce corrected expectations without R; the post-audit combined suite passes (`97 passed, 8 skipped`). |
 | Phase 2 Python plots | **DONE; MERGED** | PR #22 merged at `a287ad2`; the plotting layer is now called directly by the R-free pipeline. |
 | Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
 | Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
@@ -70,6 +70,18 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
   `PHASE4_NATIVE_NOTES.md`. Final combined verification: `git diff --check`, Python compilation,
   and the complete test suite all passed (`95 passed, 8 skipped, 43 known dependency warnings in
   56.53s`). Packaging remains deferred until this scientific layer is reviewed and merged.
+
+- **2026-07-19 — PR #23 fresh-context audit hardening.** Rejected missing or ambiguous AIRR V/J
+  calls before heavy-chain ranking, normalized allele-only alternatives to a single gene, and
+  prohibited incomplete V/J families at core initialization. Made Awkward optional for the CSV
+  import path and documented the required SciPy/Matplotlib versus AIRR/scverse environments.
+  Persisted the selected cell-to-node mapping in `airr.obs["benisse_clone_id"]` with expanded-clone
+  H5MU round-trip coverage. Native provenance now records source/scientific-input/checkpoint
+  hashes, software versions, and Git identity. Corrected the NSCLC label count to 1,612 selected
+  cells. Verification: focused adapter/native suite `30 passed, 4 skipped`; complete suite
+  `97 passed, 8 skipped` with 48 known dependency warnings. Both `git diff --check` and Python
+  compilation passed. All three AIRR milestones were rerun after the selection change and retained
+  their baselines: BGCV09_CV0171 11 edges, AP4 22, and MH9143277 98.
 
 - **2026-07-18 — Phase 2 Python post-analysis and plots
   (`feat/python-post-analysis-plots`).** Added an internal implementation-neutral plotting layer

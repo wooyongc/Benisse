@@ -19,7 +19,17 @@ has received review.
 
 Both return the in-memory network, prepared matrices, complete ADMM diagnostics, latent
 distances, annotation, compatible text/CSV outputs, and generated plot paths. Output provenance
-states `implementation="corrected_python_v2"` and `runtime_requires_r=false`.
+states `implementation="corrected_python_v2"` and `runtime_requires_r=false`, and records hashes
+for the ordered scientific inputs, available source files, and encoder checkpoint together with
+software versions and the Git revision/dirty state.
+
+The AIRR route accepts only productive heavy chains with non-empty, unambiguous V and J calls.
+Allele-only alternatives (for example `IGHV3-23*01,IGHV3-23*02`) normalize to their common gene;
+missing or multi-gene calls are excluded before abundance ranking and can never create a shared
+empty-string candidate family. The selected cell-to-node assignment is persisted as
+`airr.obs["benisse_clone_id"]`, including clonally expanded cells, and is H5MU-round-trip tested.
+Awkward remains an AIRR-only dependency: standard-CSV users need SciPy and Matplotlib but can
+import and run the pipeline without installing the scverse stack.
 
 ## R preparation and initialization port
 

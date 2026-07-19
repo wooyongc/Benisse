@@ -81,7 +81,8 @@ writes a nonempty PDF. No generated plot is committed over the reference R PDFs.
 
 ## R-free corrected v2 pipeline
 
-Run preprocessing parity, R-free integration, output-contract, and dual-oracle topology tests:
+Run preprocessing parity, R-free integration, output-contract, AIRR-call policy,
+expanded-clone H5MU round-trip, optional-dependency, and dual-oracle topology tests:
 
 ```sh
 conda run -n benisse-scirpy022 python -m pytest tests/test_native_pipeline.py \

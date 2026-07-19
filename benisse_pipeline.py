@@ -8,8 +8,12 @@ invoked by the runtime functions below.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
+from importlib import metadata
 import json
+import platform
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import numpy as np
@@ -19,7 +23,12 @@ from scipy.sparse.csgraph import connected_components
 
 import airr_adapter as aa
 from benisse_core import ADMMResult, HyperParameters, latent_distances, run_admm
-from benisse_preprocessing import PreparedCoreInputs, prepare_csv_inputs, prepare_frames
+from benisse_preprocessing import (
+    PreparedCoreInputs,
+    normalize_barcode,
+    prepare_csv_inputs,
+    prepare_frames,
+)
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,81 @@ def encode_bcr_csv(encoder_input_csv, encoded_csv, *, cuda=False) -> Path:
     encoded_csv = Path(encoded_csv)
     encode_bcr(str(encoder_input_csv), str(encoded_csv), cuda=cuda)
     return encoded_csv
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _file_hashes(**paths) -> dict[str, str]:
+    return {name: _sha256_file(Path(path)) for name, path in paths.items()}
+
+
+def _software_versions() -> dict[str, str]:
+    versions = {"python": platform.python_version()}
+    for package in (
+        "numpy", "pandas", "scipy", "scikit-learn", "torch", "matplotlib",
+        "awkward", "anndata", "mudata", "scirpy",
+    ):
+        try:
+            versions[package] = metadata.version(package)
+        except metadata.PackageNotFoundError:
+            continue
+    return versions
+
+
+def _code_identity() -> dict[str, Any]:
+    root = Path(__file__).resolve().parent
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=root, check=True,
+            capture_output=True, text=True,
+        ).stdout.strip()
+        dirty = bool(subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"], cwd=root,
+            check=True, capture_output=True, text=True,
+        ).stdout.strip())
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        revision, dirty = "unavailable", None
+    return {"revision": revision, "dirty": dirty}
+
+
+def _scientific_inputs_sha256(prepared: PreparedCoreInputs) -> str:
+    """Hash the ordered numerical inputs actually supplied to corrected ADMM."""
+    digest = hashlib.sha256()
+
+    def add_strings(label, values):
+        digest.update(label.encode())
+        for value in values:
+            encoded = str(value).encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "little"))
+            digest.update(encoded)
+
+    def add_array(label, value):
+        array = np.ascontiguousarray(value, dtype="float64")
+        digest.update(label.encode())
+        digest.update(np.asarray(array.shape, dtype="int64").tobytes())
+        digest.update(array.tobytes())
+
+    add_strings("expression_rows", prepared.expression.index)
+    add_strings("expression_columns", prepared.expression.columns)
+    add_strings("cell_clone_ids", prepared.cell_clone_ids)
+    add_strings("node_ids", prepared.node_ids)
+    add_array("expression", prepared.expression.to_numpy())
+    add_array("embedding", prepared.embedding)
+    add_array("phi", prepared.phi)
+    add_array("SI", prepared.si_matrix)
+    add_array("LS", prepared.ls_matrix)
+    return digest.hexdigest()
+
+
+def _encoder_model_identity() -> dict[str, str]:
+    checkpoint = Path(__file__).resolve().parent / "dependency" / "trained_model.pt"
+    return {"path": "dependency/trained_model.pt", "sha256": _sha256_file(checkpoint)}
 
 
 def _validate_params(params: BenisseParams) -> None:
@@ -220,7 +304,12 @@ def run_prepared_pipeline(
     _validate_core_result(core, prepared.si_matrix)
     latent = latent_distances(core.q_matrix, params.m, params.gamma)
     latent[np.abs(latent) < 1e-12] = 0
-    provenance = dict(provenance or {})
+    provenance = {
+        **dict(provenance or {}),
+        "scientific_inputs_sha256": _scientific_inputs_sha256(prepared),
+        "software_versions": _software_versions(),
+        "code": _code_identity(),
+    }
     network = _network_from_core(prepared, core, params, provenance)
     annotation = prepared.annotation.copy()
     annotation["graph_label"] = _component_annotation(network)
@@ -269,12 +358,22 @@ def run_encoded_csv_pipeline(
     )
     if prepared.n_nodes > max_nodes:
         raise ValueError(f"refusing {prepared.n_nodes} nodes; max_nodes={max_nodes}")
+    supplied_provenance = dict(provenance or {})
+    supplied_hashes = dict(supplied_provenance.pop("inputs_sha256", {}))
     source_provenance = {
+        **supplied_provenance,
         "source_type": "standard_csv",
         "expression_csv": str(Path(expression_csv)),
         "contigs_csv": str(Path(contigs_csv)),
         "encoded_csv": str(Path(encoded_csv)),
-        **(provenance or {}),
+        "inputs_sha256": {
+            **supplied_hashes,
+            **_file_hashes(
+                expression_csv=expression_csv,
+                contigs_csv=contigs_csv,
+                encoded_csv=encoded_csv,
+            ),
+        },
     }
     return run_prepared_pipeline(
         prepared,
@@ -310,7 +409,11 @@ def run_csv_pipeline(
         params=params,
         generate_plots=generate_plots,
         max_nodes=max_nodes,
-        provenance={"encoder_input_csv": str(Path(encoder_input_csv))},
+        provenance={
+            "encoder_input_csv": str(Path(encoder_input_csv)),
+            "inputs_sha256": _file_hashes(encoder_input_csv=encoder_input_csv),
+            "encoder_model": _encoder_model_identity(),
+        },
     )
 
 
@@ -356,14 +459,30 @@ def _mudata_frames(
             "full_length": True,
             "productive": True,
             "chain": heavy["locus"].astype(str).to_numpy(),
-            "v_gene": heavy["v_call"].fillna("").astype(str).to_numpy(),
-            "j_gene": heavy["j_call"].fillna("").astype(str).to_numpy(),
+            "v_gene": heavy["v_call"].astype(str).to_numpy(),
+            "j_gene": heavy["j_call"].astype(str).to_numpy(),
             "cdr3": heavy["junction_aa"].astype(str).to_numpy(),
             "cdr3_nt": junction_nt.to_numpy(),
             "umis": count.to_numpy(),
         }
     )
     return expression, contigs, heavy
+
+
+def _attach_cell_clone_mapping(mdata, heavy: pd.DataFrame, prepared: PreparedCoreInputs) -> None:
+    """Persist the selected cell-to-Benisse-node assignment in the AIRR modality."""
+    selected_cells = list(map(str, heavy.index))
+    prepared_cells = list(map(str, prepared.expression.columns))
+    if [normalize_barcode(cell) for cell in selected_cells] != prepared_cells:
+        raise RuntimeError("selected AIRR cells and prepared clone assignments are misaligned")
+    mapping = dict(zip(selected_cells, map(str, prepared.cell_clone_ids)))
+    airr = mdata.mod["airr"]
+    aligned = pd.Series(
+        [mapping.get(str(cell)) for cell in airr.obs_names],
+        index=airr.obs_names,
+        dtype="object",
+    )
+    airr.obs["benisse_clone_id"] = pd.Categorical(aligned)
 
 
 def run_mudata_pipeline(
@@ -386,7 +505,6 @@ def run_mudata_pipeline(
     )
     estimated_nodes = int(
         heavy[["v_call", "junction_aa", "j_call"]]
-        .fillna("")
         .astype(str)
         .agg("_".join, axis=1)
         .nunique()
@@ -396,7 +514,11 @@ def run_mudata_pipeline(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     encoder_input = output_dir / "encoder_input.csv"
-    aa.write_encoder_input_csv(heavy, encoder_input)
+    # The encoder embedding is a function of CDR3H only. Encode each unique
+    # sequence once so clonally expanded cells do not create duplicate lookup
+    # indices, then map that embedding back to every selected cell below.
+    encoder_heavy = heavy.loc[~heavy["junction_aa"].astype(str).duplicated()].copy()
+    aa.write_encoder_input_csv(encoder_heavy, encoder_input)
     encoded_csv = encode_bcr_csv(
         encoder_input, output_dir / "encoded.csv", cuda=cuda
     )
@@ -407,6 +529,12 @@ def run_mudata_pipeline(
     if prepared.n_nodes > max_nodes:
         raise ValueError(f"refusing {prepared.n_nodes} nodes; max_nodes={max_nodes}")
     source_name = str(obj) if isinstance(obj, (str, Path)) else "in_memory_mudata"
+    source_hashes = {
+        "encoder_input_csv": _sha256_file(encoder_input),
+        "encoded_csv": _sha256_file(encoded_csv),
+    }
+    if isinstance(obj, (str, Path)):
+        source_hashes["mudata"] = _sha256_file(Path(obj))
     result = run_prepared_pipeline(
         prepared,
         output_dir,
@@ -417,11 +545,14 @@ def run_mudata_pipeline(
             "source": source_name,
             "sample_id": None if sample_id is None else str(sample_id),
             "expression_layer": expression_layer,
+            "inputs_sha256": source_hashes,
+            "encoder_model": _encoder_model_identity(),
         },
     )
     lookup = encoded.set_index(encoded["index"].astype(str))[list(map(str, range(20)))]
     cell_embedding = lookup.loc[heavy["junction_aa"].astype(str)].copy()
     cell_embedding.index = heavy.index
     aa.attach_embedding(mdata, cell_embedding)
+    _attach_cell_clone_mapping(mdata, heavy, prepared)
     aa.attach_network_result(mdata, result.network)
     return mdata, result
