@@ -188,6 +188,21 @@ def test_small_admm_matches_corrected_r_and_scientific_invariants(r_golden, smal
     assert latent.min() >= -1e-13
 
 
+def test_legacy_r_and_corrected_v2_topology_gap_is_intentional(r_golden):
+    """Freeze the v1 bug-for-bug graph separately from corrected v2 behavior."""
+    corrected = np.asarray(r_golden["small"]["admm"]["sparse_graph"], dtype=bool)
+    legacy = np.asarray(
+        r_golden["small"]["legacy_production_gap"]["sparse_graph"], dtype=bool
+    )
+    corrected_edges = {tuple(item) for item in np.argwhere(np.triu(corrected, k=1))}
+    legacy_edges = {tuple(item) for item in np.argwhere(np.triu(legacy, k=1))}
+    assert corrected_edges == {(0, 1), (2, 3)}
+    assert legacy_edges == {(0, 1), (0, 2), (2, 3)}
+    assert corrected_edges < legacy_edges
+    assert r_golden["small"]["admm"]["iterations"] == 23
+    assert r_golden["small"]["legacy_production_gap"]["iterations"] == 18
+
+
 def test_solution_is_equivariant_to_node_permutation(small_case):
     inputs, _, hyper = small_case
     baseline = run_admm(

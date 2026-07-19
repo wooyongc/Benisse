@@ -20,8 +20,9 @@ Scope decisions (see ``airr_context.md`` and ``UPDATE_PLAN.md`` Phase 4b):
   ``cdr3`` (the heavy-chain junction amino-acid sequence). See
   ``CMC/data_pre.py:load_BCRdata2`` which reads ``f[['contigs','cdr3']]``.
 
-Runtime deps: numpy, pandas, awkward, scipy. AnnData/MuData are only needed by
-callers that pass those objects; this module accepts either the container or its
+Base runtime deps: numpy, pandas, scipy. Awkward and AnnData/MuData are needed
+only by callers that pass AIRR/scverse objects; importing the standard-CSV
+pipeline does not require them. This module accepts either the container or its
 raw ``obsm['airr']`` awkward array so it can be unit-tested cheaply.
 """
 
@@ -32,7 +33,10 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
-import awkward as ak
+try:  # Standard-CSV users do not need the AIRR/scverse dependency stack.
+    import awkward as ak
+except ImportError:  # pragma: no cover - exercised in an isolated import test
+    ak = None
 import numpy as np
 import pandas as pd
 
@@ -96,6 +100,18 @@ _CHAIN_FIELDS: tuple[str, ...] = (
 # --- Awkward AIRR access --------------------------------------------------
 
 
+def _require_awkward() -> None:
+    if ak is None:
+        raise ImportError(
+            "AIRR/AnnData/MuData input requires the optional 'awkward' dependency; "
+            "create environment-scirpy022.yml or install the AIRR extras."
+        )
+
+
+def _is_awkward_array(obj: Any) -> bool:
+    return ak is not None and isinstance(obj, ak.Array)
+
+
 def _airr_array(obj: Any, modality: str = "airr") -> ak.Array:
     """Return the ragged per-cell chain awkward array from a container/array.
 
@@ -103,7 +119,8 @@ def _airr_array(obj: Any, modality: str = "airr") -> ak.Array:
     (uses ``mod[modality].obsm['airr']``). Duck-typed to avoid importing
     anndata/mudata here.
     """
-    if isinstance(obj, ak.Array):
+    _require_awkward()
+    if _is_awkward_array(obj):
         return obj
     # MuData: has ``.mod`` mapping of modalities.
     mod = getattr(obj, "mod", None)
@@ -121,7 +138,7 @@ def _airr_array(obj: Any, modality: str = "airr") -> ak.Array:
 
 def _obs_names(obj: Any, modality: str = "airr") -> list[str]:
     """Cell barcodes (AIRR cell_id) aligned to the airr array rows."""
-    if isinstance(obj, ak.Array):
+    if _is_awkward_array(obj):
         return [str(i) for i in range(len(obj))]
     mod = getattr(obj, "mod", None)
     if isinstance(mod, Mapping) and modality in mod:
@@ -187,6 +204,26 @@ def _parse_productive(series: pd.Series) -> pd.Series:
     return series.map(lambda v: v in _TRUTHY).astype(bool)
 
 
+def normalize_gene_call(value: Any) -> str | None:
+    """Return one unambiguous AIRR gene name, without allele decoration.
+
+    AIRR permits comma-separated calls and allele suffixes such as ``*01``.
+    Alleles of the same gene collapse to that gene; missing calls and calls that
+    resolve to more than one gene return ``None`` and are not safe Benisse
+    V/J-family evidence.
+    """
+    if value is None or value is pd.NA or (isinstance(value, float) and np.isnan(value)):
+        return None
+    calls = {
+        item.strip().split("*", 1)[0]
+        for item in str(value).split(",")
+        if item.strip()
+    }
+    if len(calls) != 1:
+        return None
+    return calls.pop()
+
+
 def _require_chain_fields(frame: pd.DataFrame, fields: Sequence[str]) -> None:
     missing = [f for f in fields if f not in frame.columns]
     if missing:
@@ -201,11 +238,15 @@ def select_heavy_chains(
     modality: str = "airr",
     heavy_loci: Sequence[str] = HEAVY_LOCI,
     require_productive: bool = True,
+    require_gene_calls: bool = True,
 ) -> pd.DataFrame:
     """Pick exactly one heavy chain per cell, deterministically.
 
     A candidate chain must have ``locus`` in *heavy_loci*, a non-empty
     ``junction_aa``, and (when *require_productive*) a truthy ``productive``.
+    By default it must also have unambiguous ``v_call`` and ``j_call`` values.
+    Allele-only alternatives are normalized to a single gene name; ambiguous
+    multi-gene calls are dropped before ranking.
     Candidates are ranked per cell by descending abundance count, then ascending
     ``junction_aa``, then ascending ``sequence_id``, then storage position. Given
     AIRR's guarantee that ``sequence_id`` is unique, this is a total order on
@@ -225,6 +266,8 @@ def select_heavy_chains(
     required = ["locus", "junction_aa", "sequence_id"]
     if require_productive:
         required.append("productive")
+    if require_gene_calls:
+        required.extend(["v_call", "j_call"])
     _require_chain_fields(chains, required)
 
     cand = chains[chains["locus"].isin(list(heavy_loci))].copy()
@@ -232,6 +275,10 @@ def select_heavy_chains(
     cand = cand[ja.notna() & (ja.str.len() > 0)]
     if require_productive:
         cand = cand[_parse_productive(cand["productive"])]
+    if require_gene_calls:
+        cand["_v_gene"] = cand["v_call"].map(normalize_gene_call)
+        cand["_j_gene"] = cand["j_call"].map(normalize_gene_call)
+        cand = cand[cand["_v_gene"].notna() & cand["_j_gene"].notna()]
 
     if cand.empty:
         return pd.DataFrame(columns=chains.columns.drop("cell_id")).rename_axis("cell_id")
@@ -249,6 +296,11 @@ def select_heavy_chains(
         kind="mergesort",
     )
     winners = cand.drop_duplicates("cell_id", keep="first")
+    if require_gene_calls:
+        winners = winners.copy()
+        winners["v_call"] = winners["_v_gene"]
+        winners["j_call"] = winners["_j_gene"]
+        winners = winners.drop(columns=["_v_gene", "_j_gene"])
     winners = winners.drop(columns=["_cell_order", "_ja", "_sid", "chain_pos"])
     return winners.set_index("cell_id")
 
@@ -261,7 +313,7 @@ def scirpy_primary_heavy_index(obj: Any, modality: str = "airr") -> "pd.Series |
     (e.g. a hand-built synthetic object). Used to cross-check that our
     independent ranking agrees with the ecosystem's deterministic selection.
     """
-    if isinstance(obj, ak.Array):
+    if _is_awkward_array(obj):
         return None
     mod = getattr(obj, "mod", None)
     if isinstance(mod, Mapping) and modality in mod:
@@ -271,6 +323,7 @@ def scirpy_primary_heavy_index(obj: Any, modality: str = "airr") -> "pd.Series |
     obsm = getattr(adata, "obsm", None)
     if obsm is None or "chain_indices" not in obsm:
         return None
+    _require_awkward()
     ci = obsm["chain_indices"]
     vdj0 = ak.to_list(ci["VDJ"][:, 0])
     cell_ids = _obs_names(obj, modality)

@@ -15,8 +15,8 @@ scientific invariants of the R oracle. Phase 4d adds small corrected-R fixtures 
 NumPy/SciPy kernel, finite-difference gradient checks, optimizer-status enforcement, a complete
 four-node ADMM comparison, permutation and alternate-hyperparameter cases, and a configuration
 test for the `n > 1000` optimizer branch without allocating a large matrix. It runs entirely
-on CPU. Guarded sample-level and committed-example validation of the experimental Python core
-is described in `PHASE4D_NOTES.md`.
+on CPU. The corrected core is now the internal v2 default; guarded frozen-R migration
+comparisons are described in `PHASE4D_NOTES.md` and `PHASE4_NATIVE_NOTES.md`.
 
 Regenerate and inspect the Phase 4d component oracle with:
 
@@ -31,7 +31,7 @@ Run the complete **legacy R pipeline** oracle check explicitly:
 BENISSE_RUN_SLOW_TESTS=1 conda run -n benisse-scirpy022 python -m pytest -m slow -v
 ```
 
-This check does not validate the experimental Python core. It takes several minutes; stable
+This check reproduces the frozen v1 R oracle rather than corrected v2. It takes several minutes; stable
 CSV/text outputs are compared byte-for-byte,
 `Benisse_results.RData` is compared semantically with exact sparse-edge agreement, and PDF
 plots are rasterized with `pdftoppm` before byte comparison so timestamps do not cause false
@@ -78,3 +78,25 @@ correlations from the committed `Benisse_results.RData` into pytest's temporary 
 Python expression-distance matrix and correlation statistics are then compared directly with
 that oracle. Synthetic checks cover sparse and empty graphs and verify that every Python plot
 writes a nonempty PDF. No generated plot is committed over the reference R PDFs.
+
+## R-free corrected v2 pipeline
+
+Run preprocessing parity, R-free integration, output-contract, AIRR-call policy,
+expanded-clone H5MU round-trip, optional-dependency, and dual-oracle topology tests:
+
+```sh
+conda run -n benisse-scirpy022 python -m pytest tests/test_native_pipeline.py \
+  tests/test_python_r_core.py -v
+```
+
+The regular NSCLC preprocessing test invokes R only to export frozen preparation matrices into
+pytest's temporary directory; the runtime integration test explicitly prevents the legacy bridge
+from being called. Full corrected-v2 revalidation is opt-in:
+
+```sh
+BENISSE_RUN_NATIVE_EXAMPLE=1 conda run -n benisse-scirpy022 \
+  python -m pytest tests/test_native_pipeline.py -k native_nsclc -v
+
+BENISSE_RUN_NATIVE_LOCAL_DATA=1 conda run -n benisse-scirpy022 \
+  python -m pytest tests/test_native_pipeline.py -k native_stephenson -v
+```

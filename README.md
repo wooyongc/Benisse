@@ -13,13 +13,14 @@ Please refer to our paper for more details : [Interpreting the B-cell receptor r
 Researchers searching for more immunology-related bioinformatics tools can visit our lab website: https://qbrc.swmed.edu/labs/wanglab/index.php.
 
 ### Dependencies
-Python (version 3.10), R (version 4.3)
+Python (version 3.10). R 4.3 is optional and retained only for frozen v1 scientific-oracle tests;
+the corrected v2 runtime is Python-only.
 
 **Python Packages**
 
 pytorch (version 2.2.2, CPU build), pandas (version 2.3.3), scikit-learn, and numpy (version 1.26.4)
 
-**R Packages**
+**Optional legacy-oracle R Packages**
 
 ggplot2 (version 3.5.1; requires >= 3.4.0), data.table (version 1.16.0), and igraph (version 2.1.4; requires >= 2.0.0).
 
@@ -45,14 +46,16 @@ conda activate benisse
 # Install dependencies.
 # Note: install `scikit-learn`, not the deprecated `sklearn` stub on PyPI.
 # torch 2.2.2 is the last version with Intel-macOS (x86_64) CPU wheels.
-pip install "torch==2.2.2" "pandas==2.3.3" "numpy==1.26.4" scikit-learn
+pip install "torch==2.2.2" "pandas==2.3.3" "numpy==1.26.4" \
+  "scipy==1.15.3" "matplotlib==3.10.9" scikit-learn
 
 # Deactivate the environment when you are done with the analyses
 conda deactivate
 ```
 
-For the v2 AnnData/AIRR integration work, an isolated Scirpy compatibility environment is
-also recorded in `environment-scirpy022.yml`:
+The commands above support the standard-CSV v2 workflow and its default plots. AnnData/AIRR
+input additionally needs Awkward, AnnData, MuData, and Scirpy; use the fully pinned compatibility
+environment recorded in `environment-scirpy022.yml`:
 
 ```{shell}
 conda env create -f environment-scirpy022.yml
@@ -123,8 +126,9 @@ This script generates the numerical BCR embeddings, which is used as an input in
 
 **Fig.3 |** An example BCR embedding generated
 
-### Step 2: Run the core Benisse model
-Using the generated BCR embedding, we can now run the R script, which is a sparse graph learner supervised on the single cell gene expression data. The following table describes the input parameters:
+### Step 2: Run the corrected v2 Benisse model
+Using the generated BCR embedding, the corrected Python sparse-graph learner is supervised on
+the single-cell expression data. The following table describes the parameters:
 
 |Parameters|Description|
 |----------|-------|
@@ -140,22 +144,33 @@ Using the generated BCR embedding, we can now run the R script, which is a spars
 |m|Hyperparameter for Benisse. Dimension of the latent space. |
 |stop_cutoff|The variable is used to check the convergence. The algorithm stops if the mean squared distance between the sparse graph connection strength of the last 10 iterations is smaller than stop_cutoff|
 
-The following example code runs the core Benisse model. We recommend using the hyperparameters in the following example to start with. For detailed explanation of the hyperparameters, please refer to Supplementary Note 1. of our paper.
+The following development-branch example runs the complete encoder, corrected core, and Python
+plots. We recommend these paper-example hyperparameters as a starting point. Packaging and the
+final CLI are intentionally deferred until this scientific workflow stabilizes.
 
-```{r}
-# Navigate to the path you installed Benisse
-cd path/to/Benisse
+```python
+from benisse_pipeline import BenisseParams, run_csv_pipeline
 
-# Run the core Benisse model
-Rscript Benisse.R \
-example/10x_NSCLC_exp.csv \
-example/10x_NSCLC_contigs.csv \
-example/encoded_10x_NSCLC.csv \
-example \
-1610 1 100 1 1 10 1e-10
+result = run_csv_pipeline(
+    "example/10x_NSCLC.csv",
+    "example/10x_NSCLC_exp.csv",
+    "example/10x_NSCLC_contigs.csv",
+    "/tmp/benisse-v2-example",
+    params=BenisseParams(),
+    cuda=False,
+)
+print(result.network.n_nodes, result.network.n_edges)
 ```
 
-After the R script has been run, it will output the following files:
+The corrected v2 example has 1,494 nodes and 1,592 edges. The frozen v1 R result has 1,691
+edges because its undirected `A` update uses an inconsistent directed parameterization and
+Jacobian. This is an intentional scientific migration documented in `PHASE4_NATIVE_NOTES.md`.
+
+For MuData/AIRR input, `run_mudata_pipeline(...)` performs deterministic productive-heavy-chain
+selection, attaches cell embeddings to `mdata.mod["airr"].obsm["X_benisse"]`, and stores the
+clone network under `mdata.uns["benisse"]`.
+
+The corrected Python pipeline writes compatible scientific tables plus Python-native plots:
 
 |Output|Description|
 |----------|-------|
@@ -164,8 +179,16 @@ After the R script has been run, it will output the following files:
 |clonality_label.txt|Corresponding relationship between individual B cells and B cell clonotypes|
 |sparse_graph.txt|A sparse graph built by Benisse, where each node represents a B cell clonotype and edge weights represent the similarity between BCRs (higher is more similar)|
 |latent_dist.txt|Distances between the BCR clonotypes in the latent space, learned by Benisse through the supervision of gene expression information|
-|connectionplot.pdf|Visualization of the connection graph of BCR clonotypes in the latent space learned by Benisse|
-|in_cross_dist_check.pdf|Visualization of BCR distances in the latent space between different BCR clonotype pair types. Refer to Fig. 1f of our manuscript for more detailed explanation|
+|python_connectionplot.pdf|Visualization of encoder coordinates and corrected graph edges|
+|python_latent_distance_groups.pdf|Latent BCR distances grouped by graph relationship|
+|python_network_summary.pdf|Clone-size, component-size, and retained-candidate-edge diagnostics|
+|python_coupling_correlation.pdf|Expression–BCR coupling scatter and Spearman statistics|
+
+### Frozen v1 R oracle
+
+`Benisse.R`, its historical outputs, and the Phase 4c bridge remain available to reproduce and
+test the published behavior. They are no longer the v2 runtime backend. Do not rebaseline v1
+outputs to corrected-v2 topology.
 
 
 

@@ -152,6 +152,24 @@
       "graph_change_mean": 0,
       "graph_change_sd": 0,
       "optimizer_convergence": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    "legacy_production_gap": {
+      "A": [
+        [0, 0.40000000000000002, 0.40000000000000002, 0],
+        [0.40000000000000002, 0, 0, 0],
+        [0.40000000000000002, 0, 0, 0.40000000000000002],
+        [0, 0, 0.40000000000000002, 0]
+      ],
+      "sparse_graph": [
+        [false, true, true, false],
+        [true, false, false, false],
+        [true, false, false, true],
+        [false, false, true, false]
+      ],
+      "iterations": 18,
+      "converged": true,
+      "graph_change_mean": 0,
+      "graph_change_sd": 0
     }
   }
 }

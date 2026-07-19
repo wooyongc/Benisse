@@ -1,9 +1,8 @@
 # Phase 2 Python post-analysis and plots
 
-Status: implemented as an **internal, implementation-neutral plotting layer** on
-`feat/python-post-analysis-plots`. It consumes the shared `BenisseNetworkResult` contract and
-therefore works with the supported Phase 4c R bridge or the experimental corrected Python core.
-It does not change which numerical implementation is the default.
+Status: implemented as an **internal, implementation-neutral plotting layer**. It consumes the
+shared `BenisseNetworkResult` contract, works with frozen v1 R results and corrected v2 Python
+results, and is now called directly by the R-free default pipeline.
 
 ## What was delivered
 

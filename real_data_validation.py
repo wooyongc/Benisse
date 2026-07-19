@@ -1,8 +1,9 @@
-"""Guarded local real-data validation for the experimental Python core.
+"""Guarded legacy-R comparison for the corrected Python v2 core.
 
-This is internal validation tooling, not a public data-ingress API. It keeps the
-Phase 4c R bridge as the supported path and refuses large MuData samples by
-default. Stephenson inputs and generated outputs remain local/gitignored.
+This is oracle tooling, not the default runtime or a public data-ingress API. It
+intentionally invokes frozen R preparation/results for migration comparisons.
+The runtime path is ``benisse_pipeline.py`` and does not require R. Stephenson
+inputs and generated outputs remain local/gitignored.
 """
 
 from __future__ import annotations
