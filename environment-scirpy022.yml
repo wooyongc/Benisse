@@ -10,6 +10,10 @@ dependencies:
   - numpy=1.26.4
   # Phase 4d translates R's bounded L-BFGS-B graph update to scipy.optimize.
   - scipy=1.15.3
+  # Phase 2 Python-native scientific plots; umap-learn also enables the
+  # optional nonlinear clonotype-network layout.
+  - matplotlib=3.10.9
+  - umap-learn=0.5.12
   # Pin the last readily available Intel-macOS wheel pair. Without these pins,
   # pip selects Numba 0.66 and attempts an unsupported local OpenMP/LLVM build.
   - numba=0.61.2
