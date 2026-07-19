@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 4a audit follow-up active; Phase 4b contract merged
+Status: LIVING PLAN — Phase 4c merged; Phase 4d locally validated, default decision pending
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -41,15 +41,57 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | AIRR processed-data license | **BLOCKED** | Confirm redistribution terms before publishing either downloaded object; objects remain gitignored. |
 | Large-file/history cleanup | **PENDING** | Coordinate the remaining asset migration and one repository-wide history rewrite later; document Zenodo/DOI implications first. |
 | In-house cohort data | **DONE in active tree; history pending** | Archived on the existing Figshare record and removed from the repository tree at the maintainer's direction; remove its old blob during the coordinated history rewrite. |
-| Phase 4a parity harness/internal modularization | **DONE; audit strengthened** | Combined post-Phase-4b pytest: 29 passed, 1 slow skipped. Direct convergence cancellation coverage, true multi-file/order metamorphic cases, encoder schema checks, hash-ledger completeness, and R scientific invariants supplement the full oracle. |
-| Phase 4b AnnData/AIRR I/O | **DONE; open integration assumptions documented** | Claude Code's `61c91fb` was merged by PR #17 into `develop/v2-modernization` at `2e7a940`; synthetic and optional AP4 adapter tests, field mapping, embedding/result schemas, and derivation tooling are included. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
-| Phase 4c Python→R bridge | **PENDING** | Follows 4b and provides an end-to-end Python-facing scientific harness. |
-| Phase 4d R-core port | **PENDING** | Compare against the corrected R oracle with exact edge-set checks. |
+| Phase 4a parity harness/internal modularization | **DONE; audit merged** | PR #18 added direct convergence cancellation coverage, true multi-file/order metamorphic cases, encoder schema checks, hash-ledger completeness, and R scientific invariants. |
+| Phase 4b AnnData/AIRR I/O | **DONE; audit hardened** | PR #17 added the contract and PR #19 merged its fresh-context hardening into `develop/v2-modernization` at `ac52d61`. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
+| Phase 4c Python→R bridge | **DONE; MERGED** | PR #21 merged the standard-CSV encoder→R→`BenisseNetworkResult` bridge into `develop/v2-modernization` at `0ceb21e`; it remains the supported execution path. |
+| Phase 4d R-core port | **LOCALLY VALIDATED; DEFAULT DECISION PENDING** | Corrected kernels pass small oracles plus three complete Stephenson samples (92–427 nodes) and the 1,494-node committed NSCLC example. The port converges with successful optimizers and highly concordant latent geometry, but prunes legacy edges (up to 11/33 on AP4); do not make it default without an explicit migration decision. |
 | Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
 | Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
 | Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
 
 ### Work log
+
+- **2026-07-18 — Phase 4d guarded real-data hardening after Phase 4c merge.** Merged the
+  Phase 4c bridge (PR #21, `0ceb21e`) into `feat/python-r-core-port` and reused its shared
+  `BenisseNetworkResult` schema for comparisons. Added internal, opt-in validation that selects
+  one complete MuData sample, refuses more than 500 clone nodes by default, exports exact
+  production-R initialization matrices, and requires convergence, successful inner solves,
+  finite symmetric matrices, valid support, and positive-definite `Q`. A 94-cell validation
+  exposed a pre-existing reporting crash when `testCor` computed a zero group size; clamped it
+  to one and added a direct R regression test. Complete Stephenson samples BGCV09_CV0171,
+  AP4, and MH9143277 (92, 203, and 427 nodes) all converged in 0.09–1.62 s in the corrected
+  Python core. The committed NSCLC example (1,494 nodes) converged in 73.04 s. Corrected-vs-
+  legacy edge Jaccard was 1.000, 0.667, 0.933, and 0.941 respectively; latent-distance
+  Spearman was 0.9933–0.9985. The corrected core added no legacy-absent edges and pruned
+  0, 11, 7, and 99. This is strong local stability evidence but not silent scientific
+  equivalence: Phase 4c stays default pending a maintainer decision and migration notes.
+  The 4,833-clone multi-patient 5k object was deliberately not treated as one graph. Detailed
+  protocol and results are recorded in `PHASE4D_NOTES.md`. Verification after merging 4c:
+  78 passed, 4 explicit local/slow checks skipped in 14.77s; the focused 4c/4d/R-invariant
+  selection passed 42 with 3 explicit skips in 10.34s.
+
+- **2026-07-18 — Phase 4d corrected small-fixture scope (`feat/python-r-core-port`).** A
+  fresh-context audit found that the first directed-coordinate translation supplied an
+  inconsistent Jacobian to SciPy, silently accepted `ABNORMAL` L-BFGS-B exits, and therefore
+  could report ADMM convergence after failed inner solves. Replaced it with one variable per
+  undirected upper-triangle edge and the paper's mathematically corresponding symmetric-edge
+  gradient. `A` is now symmetric by construction, objective and Jacobian share one dense
+  evaluation, solver metadata is retained, and any failed inner solve aborts ADMM. Replaced
+  the legacy optimizer fixture with a corrected test-only R oracle and added central finite
+  differences, successful-solver/KKT checks, exact small corrected-R comparisons, a complete
+  four-node ADMM run, permutation equivariance, an eight-node alternate case, empty-graph and
+  invalid-input cases, and allocation-free verification of the `n > 1000` policy. Production
+  `R/update.R`, committed example outputs, and hashes are unchanged. The earlier 1,494-node
+  diagnostics are retained only as audit history and are **not** evidence for the corrected
+  algorithm. Full-example/cohort-scale scientific equivalence is deferred due to available
+  compute and data bandwidth; the Python module remains internal/experimental, Phase 4c is the
+  supported execution path, and R retirement is not authorized. Verification: corrected
+  fixture regeneration is byte-identical; Phase 4d focused suite 19 passed in 0.63s; combined
+  fast suite 57 passed, 1 legacy slow test skipped in 12.57s.
+- **2026-07-18 — Phase 4b audit/hardening merged.** PR #18 merged the independent Phase 4a
+  parity audit (`7fe8f7c`), and PR #19 merged Claude Code's AIRR adapter hardening (`44bff80`)
+  into `develop/v2-modernization` at `ac52d61`. Phase 4c and the isolated Phase 4d numerical
+  port can therefore proceed concurrently from the same audited base.
 
 - **2026-07-18 — independent Phase 4a test audit follow-up
   (`test/scientific-parity-harness`).** A fresh-context agent found that the single full oracle
@@ -264,25 +306,26 @@ than designing the packaging from scratch.
   and exact sparse edge-set agreement. Extracted only the callable internal encoder boundaries
   needed by tests and later adapters. Do **not** publish a package, promise a public Python API,
   redesign the CLI, or rearrange model assets yet.
-- 4b — AnnData/AIRR I/O: read/write `.h5ad`/`.h5mu`; embeddings into `adata.obsm`.
-  **Groundwork DONE:** AIRR best practices are distilled in local `airr_context.md`; the
+- **DONE — 4b AnnData/AIRR I/O:** read/write `.h5ad`/`.h5mu`; embeddings into `adata.obsm`.
+  AIRR best practices are distilled in local `airr_context.md`; the
   ignored Stephenson 5k MuData reference and deterministic AP4 203-cell BCR fixture are
   recorded in `data/manifest.yaml` with checksums and provenance; Scirpy 0.22.3 is working
-  on this Intel Mac via `environment-scirpy022.yml`. **Pending implementation:** define the
-  explicit AIRR→Benisse heavy-chain selection and field mapping, add a reproducible fixture
-  derivation script, and test embedding writes without destroying the AIRR modality. Do not
-  publish the downloaded/derived objects until their processed-data redistribution license is
-  confirmed.
-- 4c — Interim Python→R bridge. Expose the core from Python via a thin subprocess/rpy2
+  on this Intel Mac via `environment-scirpy022.yml`. The merged adapter defines deterministic
+  heavy-chain selection and field mapping, includes a reproducible fixture derivation script,
+  and tests embedding writes without destroying the AIRR modality. Do not publish the
+  downloaded/derived objects until their processed-data redistribution license is confirmed.
+- **ACTIVE — 4c interim Python→R bridge.** Expose the core from Python via a thin subprocess/rpy2
   wrapper around the UNMODIFIED `Benisse.R`, so users get end-to-end Python UX without
   betting correctness on an unproven port. Treat this as an internal/scientific interface;
   defer the polished public CLI.
-- 4d — Port the R core to Python against the R oracle behind a strengthened parity
-  gate: assert **discrete edge-set agreement** on `sparse_graph` (e.g. exact/near-exact
-  Jaccard on edge sets), NOT only elementwise tolerance on `latent_dist.txt` — because
-  `A>0` thresholding (`util.R:26-27`) means sub-tolerance drift can flip edges. The
-  `util.R:38` convergence bug is resolved in the oracle: implement the corrected
-  `sum(delta^2)/n^2` definition and require the exact reference edge set.
+- **EXPERIMENTAL — 4d R-core port; small-fixture scope complete, scale validation deferred.**
+  The Python core uses the mathematically correct symmetric-edge parameterization and is tested
+  against a corrected, test-only R implementation on small deterministic cases. Component
+  kernels require explicit tight tolerances, every inner optimizer must report success, and
+  scientific invariants and node-order equivariance are enforced. Full example/cohort edge-set,
+  latent-geometry, and downstream biological equivalence remain unverified and must not be
+  inferred from the component tests. Do not switch the default execution path or retire R until
+  compute and representative data are available for that work.
   **Why port ADMM rather than replace it:** the ADMM sparse-graph is the differentiator —
   convex, interpretable, and it guarantees the learned graph is a strict sparse subset of the
   crude graph (`benisse_context.md` §5). BiGCN's GCN fusion (`bigcn_context.md`) is a known
@@ -516,9 +559,12 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork +
 Phase 4a scientific parity harness and callable encoder boundary.
 
-**NEXT:** proceed through 4b (AnnData/AIRR I/O) → 4c (internal subprocess/R bridge)
-→ 4d (Python port behind the exact edge-set parity gate) → Phase 2 Python plots → 4e (package,
-public CLI, CI, tutorial, migration notes, Seurat bridge, and R-stage retirement) → competitive
+**NEXT DECISION:** keep the merged Phase 4c R bridge as the v2 default, or deliberately adopt
+the corrected Phase 4d Python core with scientific migration notes and regenerated reference
+expectations. Local validation establishes numerical stability but also shows real edge pruning,
+so the default must not change implicitly. After that decision, proceed to Phase 2 Python plots
+against the shared result object → 4e (package,
+public CLI, CI, tutorial, migration notes, and Seurat bridge) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
 and tag v2 only after the release gates below pass. Coordinate the remaining large-asset move
 and one history rewrite before that release; the in-house cohort file is already absent from
@@ -529,6 +575,7 @@ the active tree and its historical blob should be removed in that rewrite.
 - Fresh environment install succeeds on supported CPU platforms.
 - Packaged encoder and AnnData/AIRR round-trip tests pass on the deterministic fixture.
 - Python-facing end-to-end workflow reproduces the R oracle's discrete sparse edge set.
+- Experimental Python core remains non-default unless full-scale equivalence is later validated.
 - Large-file location, Zenodo/DOI implications, and human-subject data governance are resolved
   and documented.
 - CI smoke tests, user tutorial, migration notes, and license/redistribution statements pass
