@@ -64,3 +64,17 @@ BENISSE_RUN_PYTHON_CORE_EXAMPLE=1 conda run -n benisse-scirpy022 \
 For other Stephenson validations, invoke `real_data_validation.py` with one `--sample-id` and
 write outputs under `/tmp`. Do not submit the entire 5k multi-patient object as one graph; the
 tool refuses more than 500 clone nodes unless the guard is deliberately raised.
+
+## Python post-analysis parity
+
+Run the Phase 2 scientific and rendering checks with:
+
+```sh
+conda run -n benisse-scirpy022 python -m pytest tests/test_benisse_plotting.py -v
+```
+
+When R is available, this exports `master_dist_e`, the V/J candidate graph, and the two coupling
+correlations from the committed `Benisse_results.RData` into pytest's temporary directory. The
+Python expression-distance matrix and correlation statistics are then compared directly with
+that oracle. Synthetic checks cover sparse and empty graphs and verify that every Python plot
+writes a nonempty PDF. No generated plot is committed over the reference R PDFs.

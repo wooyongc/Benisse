@@ -1,6 +1,6 @@
 # Benisse Update Plan
 
-Status: LIVING PLAN — Phase 4c merged; Phase 4d locally validated, default decision pending
+Status: LIVING PLAN — Phase 2 Python plots complete; numerical-core default decision pending
 Date: 2026-07-18
 
 Benisse is a two-stage BCR analysis tool: a Python/torch encoder embeds BCR CDR3H
@@ -45,11 +45,27 @@ verified), **ACTIVE** (current branch), **PENDING** (ready but not started), **D
 | Phase 4b AnnData/AIRR I/O | **DONE; audit hardened** | PR #17 added the contract and PR #19 merged its fresh-context hardening into `develop/v2-modernization` at `ac52d61`. Track Awkward's experimental support and MuData 0.4's upcoming `.update()` behavior before lifting versions. |
 | Phase 4c Python→R bridge | **DONE; MERGED** | PR #21 merged the standard-CSV encoder→R→`BenisseNetworkResult` bridge into `develop/v2-modernization` at `0ceb21e`; it remains the supported execution path. |
 | Phase 4d R-core port | **LOCALLY VALIDATED; DEFAULT DECISION PENDING** | Corrected kernels pass small oracles plus three complete Stephenson samples (92–427 nodes) and the 1,494-node committed NSCLC example. The port converges with successful optimizers and highly concordant latent geometry, but prunes legacy edges (up to 11/33 on AP4); do not make it default without an explicit migration decision. |
-| Phase 2 Python plots | **DEFERRED** | Implement after 4d so plots use the lasting Python result object. |
+| Phase 2 Python plots | **DONE; PR PENDING** | Implementation-neutral plotting reproduces R expression-distance/coupling statistics and renders network, latent-distance, clone-size, component, and edge-retention views from `BenisseNetworkResult`. Focused: 11 passed; combined: 89 passed, 4 explicit skips. |
 | Phase 4e packaging/CLI/release hardening | **DEFERRED** | Package only after the scientific API and data model stabilize. |
 | Phase 3 tutorial | **DEFERRED** | Write against the final 4e CLI rather than documenting transitional entry points. |
 
 ### Work log
+
+- **2026-07-18 — Phase 2 Python post-analysis and plots
+  (`feat/python-post-analysis-plots`).** Added an internal implementation-neutral plotting layer
+  over `BenisseNetworkResult`, retaining the Phase 4c R bridge as the default core. It aligns
+  clone annotation, latent distances, and encoder embeddings; reconstructs V/J candidate support
+  and true connected components; and ports the clone-expression distance and `testCor`
+  aggregation algorithms. Added PCA, optional deterministic UMAP/t-SNE network layouts; clone
+  size, V/J, and component color modes; latent-distance relationship boxes; clone/component and
+  retained-edge diagnostics; and expression–BCR coupling scatter/statistics. Python PDFs use
+  separate names and never replace the R oracle. A live R fixture confirms the complete
+  1,494-node NSCLC expression-distance matrix within `rtol=2e-6`, exact candidate support, and
+  both Spearman results within `2e-8`. The audit captured two legacy semantics: within-clone
+  aggregation can make `master_dist_e`'s diagonal nonzero, and the final correlation-bin
+  remainder is appended to the last full group. Focused Phase 2 result: 11 passed in 32.94s;
+  combined fast result: 89 passed, 4 explicit local/slow skips in 41.39s. Generated full-example
+  PDFs were raster-inspected successfully. Details and usage are in `PHASE2_NOTES.md`.
 
 - **2026-07-18 — Phase 4d guarded real-data hardening after Phase 4c merge.** Merged the
   Phase 4c bridge (PR #21, `0ceb21e`) into `feat/python-r-core-port` and reused its shared
@@ -269,15 +285,16 @@ is compared object-by-object and PDFs by rasterized pages because their metadata
   manifest; include the old blob in the later coordinated history rewrite.
 
 ## Phase 2 — New plotting functions
-NOTE (re-sequenced): all current plotting is R/ggplot (`post_analysis.R` `checkDist`,
-`plotClusters`) operating on the R `Benisse_results` RData object, which won't exist in
-Python until 4d. To avoid building throwaway R plotting that Phase 4 obsoletes, either
-(a) defer the *new* plots to after 4d and write them in Python, or (b) explicitly accept
-these as interim R plots and don't invest in a "reusable module" twice. Recommended: (a),
-with only minimal fixes to existing R plots now.
-Planned plots: clonotype network colored by clone size / V-J family / graph cluster;
-UMAP/t-SNE of latent space with graph edges; clone-size + edges-remaining diagnostics;
-expression-vs-latent-distance correlation scatter (expose `testCor`).
+**DONE on `feat/python-post-analysis-plots`; PR pending.** The implementation-neutral layer consumes
+`BenisseNetworkResult`, annotation, latent distances, cleaned expression, clonality labels, and
+the encoder embedding rather than depending on an RData object. Delivered scope includes:
+clonotype networks colored by clone size / V-J family / true graph component; PCA plus optional
+UMAP/t-SNE coordinates with graph edges; clone-size, component-size, and edges-remaining
+diagnostics; the latent-distance relationship groups from `checkDist`; and expression-vs-latent
+and expression-vs-encoder coupling scatter/statistics from `testCor`. The Python reconstruction
+of `master_dist_e`, V/J candidate support, and both coupling correlations is checked directly
+against the committed R oracle. Generated PDFs use distinct `python_` names. See
+`PHASE2_NOTES.md`; public plotting API/CLI choices remain deferred to 4e.
 
 ## Phase 3 — User-friendliness & tutorials
 - Rewrite README against actual filenames and the conda/CPU workflow.
@@ -314,18 +331,17 @@ than designing the packaging from scratch.
   heavy-chain selection and field mapping, includes a reproducible fixture derivation script,
   and tests embedding writes without destroying the AIRR modality. Do not publish the
   downloaded/derived objects until their processed-data redistribution license is confirmed.
-- **ACTIVE — 4c interim Python→R bridge.** Expose the core from Python via a thin subprocess/rpy2
-  wrapper around the UNMODIFIED `Benisse.R`, so users get end-to-end Python UX without
-  betting correctness on an unproven port. Treat this as an internal/scientific interface;
-  defer the polished public CLI.
-- **EXPERIMENTAL — 4d R-core port; small-fixture scope complete, scale validation deferred.**
-  The Python core uses the mathematically correct symmetric-edge parameterization and is tested
-  against a corrected, test-only R implementation on small deterministic cases. Component
-  kernels require explicit tight tolerances, every inner optimizer must report success, and
-  scientific invariants and node-order equivariance are enforced. Full example/cohort edge-set,
-  latent-geometry, and downstream biological equivalence remain unverified and must not be
-  inferred from the component tests. Do not switch the default execution path or retire R until
-  compute and representative data are available for that work.
+- **DONE — 4c interim Python→R bridge.** A thin subprocess wrapper around `Benisse.R` gives
+  users end-to-end Python UX without betting correctness on the corrected port. It remains an
+  internal/scientific interface; the polished public CLI is deferred.
+- **EXPERIMENTAL — 4d R-core port; locally validated, default decision pending.** The Python core
+  uses the mathematically correct symmetric-edge parameterization and is tested against a
+  corrected, test-only R implementation plus three complete Stephenson samples and the
+  1,494-node paper example. Component kernels require explicit tight tolerances, every inner
+  optimizer must report success, and scientific invariants and node-order equivariance are
+  enforced. Runs converge with highly concordant latent geometry, but the corrected graph prunes
+  legacy edges (most materially 11 of 33 on AP4). Do not switch the default execution path or
+  retire R without an explicit scientific migration decision and regenerated expectations.
   **Why port ADMM rather than replace it:** the ADMM sparse-graph is the differentiator —
   convex, interpretable, and it guarantees the learned graph is a strict sparse subset of the
   crude graph (`benisse_context.md` §5). BiGCN's GCN fusion (`bigcn_context.md`) is a known
@@ -559,11 +575,13 @@ ADMM" bet and answers the reviewer/user question "why Benisse over BiGCN/mvTCR?"
 **DONE:** Phase 1 fixes + hash baseline + pandas-pin lift + AIRR/Scirpy fixture groundwork +
 Phase 4a scientific parity harness and callable encoder boundary.
 
+**DONE:** Phase 2 Python post-analysis and plots now operate on the shared result contract without
+depending on which numerical core produced it.
+
 **NEXT DECISION:** keep the merged Phase 4c R bridge as the v2 default, or deliberately adopt
 the corrected Phase 4d Python core with scientific migration notes and regenerated reference
 expectations. Local validation establishes numerical stability but also shows real edge pruning,
-so the default must not change implicitly. After that decision, proceed to Phase 2 Python plots
-against the shared result object → 4e (package,
+so the default must not change implicitly. After that decision, proceed to 4e (package,
 public CLI, CI, tutorial, migration notes, and Seurat bridge) → competitive
 benchmark vs BiGCN (gated on paper access) → Phase 5. Merge the integration branch to `main`
 and tag v2 only after the release gates below pass. Coordinate the remaining large-asset move
