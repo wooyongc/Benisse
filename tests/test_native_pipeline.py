@@ -132,6 +132,18 @@ def test_prepare_frames_rejects_missing_contract_and_handles_empty_candidate_gra
         )
 
 
+def test_prepare_frames_accepts_variable_embedding_dimensions():
+    expression, contigs, encoded = _small_standard_frames()
+    feature_columns = [str(index) for index in range(7)]
+    encoded = encoded[feature_columns + ["index"]]
+    hyper = HyperParameters(lambda1=1, lambda2=6, gamma=1, rho=1, m=2)
+
+    result = prep.prepare_frames(expression, contigs, encoded, hyper)
+
+    assert result.embedding.shape == (4, 7)
+    np.testing.assert_allclose(result.phi, result.phi.T, rtol=0, atol=1e-14)
+
+
 def test_standard_csv_pipeline_import_does_not_require_awkward():
     completed = subprocess.run(
         [
@@ -272,7 +284,7 @@ def _chain(sequence_id, junction_aa, v_call, j_call, count):
     }
 
 
-def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
+def _small_mudata():
     cells = ["cell_A-1", "cell_B-1", "cell_C-1", "cell_D-1"]
     airr = anndata.AnnData(np.zeros((4, 0), dtype=np.float32))
     airr.obs_names = cells
@@ -288,7 +300,11 @@ def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
     gex = anndata.AnnData(sparse.csr_matrix(values))
     gex.obs_names = cells
     gex.var_names = [f"g{i}" for i in range(12)]
-    mdata = mudata.MuData({"gex": gex, "airr": airr})
+    return mudata.MuData({"gex": gex, "airr": airr})
+
+
+def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
+    mdata = _small_mudata()
 
     def fail_if_r_called(*args, **kwargs):
         raise AssertionError("R runtime must not be invoked")
@@ -319,6 +335,33 @@ def test_mudata_pipeline_is_r_free_and_attaches_result(tmp_path, monkeypatch):
     restored = mudata.read_h5mu(h5mu)
     assert restored.mod["airr"].obs["benisse_clone_id"].astype(str).tolist() == clone_ids
     assert aa.read_network_result(restored).node_ids == stored.node_ids
+
+
+def test_mudata_pipeline_attaches_variable_dimension_embedding(tmp_path, monkeypatch):
+    mdata = _small_mudata()
+
+    def fake_encode(input_csv, output_csv, **_kwargs):
+        sequences = sorted(pd.read_csv(input_csv)["cdr3"].drop_duplicates())
+        encoded = pd.DataFrame(
+            [
+                {**{str(column): row + column / 10 for column in range(7)}, "index": sequence}
+                for row, sequence in enumerate(sequences)
+            ]
+        )
+        encoded.to_csv(output_csv)
+        return Path(output_csv)
+
+    monkeypatch.setattr(pipeline, "encode_bcr_csv", fake_encode)
+    attached, result = pipeline.run_mudata_pipeline(
+        mdata,
+        tmp_path,
+        params=pipeline.BenisseParams(lambda2=4, m=2),
+        generate_plots=False,
+        max_nodes=5,
+    )
+
+    assert result.prepared.embedding.shape == (3, 7)
+    assert attached.mod["airr"].obsm["X_benisse"].shape == (4, 7)
 
 
 @pytest.mark.slow

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Sequence
 
 import numpy as np
@@ -21,7 +22,6 @@ from sklearn.decomposition import PCA
 from benisse_core import HyperParameters
 
 
-ENCODER_COLUMNS = tuple(str(i) for i in range(20))
 REQUIRED_CONTIG_COLUMNS = {
     "barcode",
     "is_cell",
@@ -35,6 +35,7 @@ REQUIRED_CONTIG_COLUMNS = {
     "cdr3_nt",
     "umis",
 }
+_UNNAMED_CSV_INDEX = re.compile(r"Unnamed: [0-9]+")
 
 
 @dataclass(frozen=True)
@@ -89,13 +90,39 @@ def _numeric_expression(expression: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def embedding_feature_columns(encoded: pd.DataFrame) -> tuple:
+    """Return ordered numeric embedding columns from an encoder output frame."""
+    if encoded.columns.duplicated().any():
+        duplicates = encoded.columns[encoded.columns.duplicated()].tolist()
+        raise ValueError(f"encoded input contains duplicate columns {duplicates}")
+    _require_columns(encoded, {"index"}, "encoded input")
+    numbered = []
+    for column in encoded.columns:
+        text = str(column)
+        if text == "index" or _UNNAMED_CSV_INDEX.fullmatch(text):
+            continue
+        if isinstance(column, bool) or not re.fullmatch(r"0|[1-9][0-9]*", text):
+            raise ValueError(f"encoded input has a non-feature column {column!r}")
+        numbered.append((int(text), column))
+    if not numbered:
+        raise ValueError("encoded input contains no embedding feature columns")
+    numbered.sort(key=lambda item: item[0])
+    indices = [item[0] for item in numbered]
+    if indices != list(range(len(indices))):
+        raise ValueError(
+            "encoded feature columns must be contiguous non-negative integers "
+            f"starting at 0; found {indices}"
+        )
+    return tuple(item[1] for item in numbered)
+
+
 def _encoder_lookup(encoded: pd.DataFrame) -> pd.DataFrame:
-    _require_columns(encoded, {"index", *ENCODER_COLUMNS}, "encoded input")
+    feature_columns = embedding_feature_columns(encoded)
     if encoded["index"].isna().any():
         raise ValueError("encoded input contains a missing CDR3 index")
     if encoded["index"].astype(str).duplicated().any():
         raise ValueError("encoded input contains duplicate CDR3 indices")
-    lookup = encoded.set_index(encoded["index"].astype(str))[list(ENCODER_COLUMNS)]
+    lookup = encoded.set_index(encoded["index"].astype(str))[list(feature_columns)]
     lookup = lookup.apply(pd.to_numeric, errors="raise")
     if not np.isfinite(lookup.to_numpy(dtype="float64")).all():
         raise ValueError("encoded input contains non-finite features")
@@ -168,8 +195,14 @@ def initialize_core_inputs(
     if annotation.index.duplicated().any():
         raise ValueError("annotation node ids must be unique")
     node_ids = tuple(map(str, annotation.index))
-    if embedding.shape != (len(node_ids), 20):
-        raise ValueError(f"embedding shape {embedding.shape} != ({len(node_ids)}, 20)")
+    if (
+        embedding.ndim != 2
+        or embedding.shape[0] != len(node_ids)
+        or embedding.shape[1] < 1
+    ):
+        raise ValueError(
+            f"embedding shape {embedding.shape} must be ({len(node_ids)}, d) with d >= 1"
+        )
     if not np.isfinite(embedding).all():
         raise ValueError("embedding contains non-finite values")
     if set(cell_clone_ids) != set(node_ids):

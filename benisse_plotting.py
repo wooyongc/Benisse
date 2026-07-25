@@ -25,6 +25,7 @@ from sklearn.decomposition import PCA
 import airr_adapter as aa
 import benisse_bridge as bridge
 from benisse_preprocessing import clone_expression_distances as _clone_expression_distances
+from benisse_preprocessing import embedding_feature_columns
 
 
 DISTANCE_LABELS = (
@@ -65,15 +66,10 @@ def _validate_square_distances(
 
 def _read_embedding(encoded_csv, annotation: pd.DataFrame) -> np.ndarray:
     encoded = pd.read_csv(encoded_csv)
-    if "index" not in encoded.columns:
-        raise ValueError("encoded CSV is missing its CDR3 'index' column")
-    feature_columns = [str(i) for i in range(20)]
-    missing = set(feature_columns) - set(encoded.columns)
-    if missing:
-        raise ValueError(f"encoded CSV is missing feature columns {sorted(missing)}")
+    feature_columns = embedding_feature_columns(encoded)
     if encoded["index"].duplicated().any():
         raise ValueError("encoded CSV contains ambiguous duplicate CDR3 values")
-    lookup = encoded.set_index("index")[feature_columns]
+    lookup = encoded.set_index("index")[list(feature_columns)]
     missing_cdr3 = sorted(set(annotation["cdr3"].astype(str)) - set(lookup.index.astype(str)))
     if missing_cdr3:
         raise ValueError(f"encoded CSV is missing {len(missing_cdr3)} annotated CDR3 values")
