@@ -126,6 +126,70 @@ This script generates the numerical BCR embeddings, which is used as an input in
 
 **Fig.3 |** An example BCR embedding generated
 
+#### Experimental optional ESM-2 embedding
+
+The corrected Python-native pipeline can alternatively embed the same heavy-chain
+CDR3 amino-acid sequences with ESM-2. Achilles remains the default and the
+published reference encoder. Install the optional dependency separately:
+
+```shell
+conda activate benisse-scirpy022
+python -m pip install -r requirements-esm2.txt
+```
+
+Generate a standalone ESM-2 embedding with the CPU-appropriate 35M-parameter
+default:
+
+```shell
+python bcr_embeddings.py \
+  --input_data example/10x_NSCLC.csv \
+  --output_data /tmp/encoded_10x_NSCLC_esm2.csv \
+  --backend esm2 \
+  --model esm2_t12_35M_UR50D \
+  --cuda False
+```
+
+The first run downloads the official model and contact-regression checkpoint
+into PyTorch's hub cache. PyTorch respects `TORCH_HOME` when choosing that
+cache. After both files are cached, pass `--offline` to prohibit an accidental
+download. Every ESM-2 output has a neighboring
+`<output>.metadata.json` provenance file containing checkpoint hashes.
+
+The complete corrected Python workflow accepts the same options:
+
+```python
+from benisse_pipeline import BenisseParams, run_csv_pipeline
+
+result = run_csv_pipeline(
+    "example/10x_NSCLC.csv",
+    "example/10x_NSCLC_exp.csv",
+    "example/10x_NSCLC_contigs.csv",
+    "/tmp/benisse-esm2",
+    params=BenisseParams(),
+    cuda=False,
+    embedding_backend="esm2",
+    embedding_model="esm2_t12_35M_UR50D",
+)
+```
+
+`run_mudata_pipeline(...)` exposes the same `embedding_backend`,
+`embedding_model`, `embedding_batch_size`, and `embedding_offline` keyword
+arguments. Supported model identifiers are `esm2_t6_8M_UR50D` (320
+dimensions), `esm2_t12_35M_UR50D` (480), `esm2_t30_150M_UR50D` (640), and
+`esm2_t33_650M_UR50D` (1280).
+
+This backend uses the final ESM-2 layer, averages only the amino-acid residue
+tokens (not beginning/end/padding tokens), calculates the mean in float64, and
+L2-normalizes each sequence vector. That fixed normalization bounds the scale
+of the squared Euclidean distances consumed by Benisse; it does not establish
+that ESM-2 is scientifically superior to Achilles. The input remains CDR3H
+only, so it does not capture the full heavy/light-chain context that benefits
+many antibody language models.
+
+ESM-2 output is intentionally supported only by the corrected Python-native
+pipeline. The frozen publication oracle `Benisse.R` selects exactly 20
+Achilles columns and remains unchanged for reproducibility.
+
 ### Step 2: Run the corrected v2 Benisse model
 Using the generated BCR embedding, the corrected Python sparse-graph learner is supervised on
 the single-cell expression data. The following table describes the parameters:

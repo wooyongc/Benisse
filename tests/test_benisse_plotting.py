@@ -172,6 +172,19 @@ def test_read_committed_example_plot_data():
     assert np.isfinite(bp.edge_retention_ratio(data))
 
 
+def test_read_plot_data_preserves_variable_embedding_width(tmp_path):
+    encoded = pd.read_csv(EXAMPLE / "encoded_10x_NSCLC.csv")
+    for column in range(20, 27):
+        encoded[str(column)] = np.arange(len(encoded), dtype="float64") + column
+    encoded_csv = tmp_path / "encoded_27d.csv"
+    encoded.to_csv(encoded_csv, index=False)
+
+    data = bp.read_plot_data(EXAMPLE, encoded_csv=encoded_csv)
+
+    assert data.embedding.shape == (1494, 27)
+    assert np.isfinite(data.embedding).all()
+
+
 @pytest.mark.skipif(RSCRIPT is None, reason="Rscript is required for R post-analysis parity")
 def test_expression_distance_and_correlation_match_committed_r_oracle(tmp_path):
     subprocess.run(

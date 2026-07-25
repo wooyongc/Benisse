@@ -25,6 +25,7 @@ import airr_adapter as aa
 from benisse_core import ADMMResult, HyperParameters, latent_distances, run_admm
 from benisse_preprocessing import (
     PreparedCoreInputs,
+    embedding_feature_columns,
     normalize_barcode,
     prepare_csv_inputs,
     prepare_frames,
@@ -67,12 +68,29 @@ class NativePipelineResult:
     output_paths: dict[str, Path]
 
 
-def encode_bcr_csv(encoder_input_csv, encoded_csv, *, cuda=False) -> Path:
-    """Run the existing Python encoder without importing the legacy R bridge."""
-    from AchillesEncoder import encode_bcr
+def encode_bcr_csv(
+    encoder_input_csv,
+    encoded_csv,
+    *,
+    cuda=False,
+    embedding_backend="achilles",
+    embedding_model=None,
+    embedding_batch_size=64,
+    embedding_offline=False,
+) -> Path:
+    """Encode CDR3H sequences without importing the legacy R bridge."""
+    from bcr_embeddings import encode_bcr_embeddings
 
     encoded_csv = Path(encoded_csv)
-    encode_bcr(str(encoder_input_csv), str(encoded_csv), cuda=cuda)
+    encode_bcr_embeddings(
+        str(encoder_input_csv),
+        str(encoded_csv),
+        backend=embedding_backend,
+        model=embedding_model,
+        cuda=cuda,
+        batch_size=embedding_batch_size,
+        offline=embedding_offline,
+    )
     return encoded_csv
 
 
@@ -92,7 +110,7 @@ def _software_versions() -> dict[str, str]:
     versions = {"python": platform.python_version()}
     for package in (
         "numpy", "pandas", "scipy", "scikit-learn", "torch", "matplotlib",
-        "awkward", "anndata", "mudata", "scirpy",
+        "awkward", "anndata", "mudata", "scirpy", "fair-esm",
     ):
         try:
             versions[package] = metadata.version(package)
@@ -146,9 +164,30 @@ def _scientific_inputs_sha256(prepared: PreparedCoreInputs) -> str:
     return digest.hexdigest()
 
 
-def _encoder_model_identity() -> dict[str, str]:
-    checkpoint = Path(__file__).resolve().parent / "dependency" / "trained_model.pt"
-    return {"path": "dependency/trained_model.pt", "sha256": _sha256_file(checkpoint)}
+def _encoder_model_identity(
+    embedding_backend: str = "achilles",
+    encoded_csv=None,
+) -> dict[str, Any]:
+    if embedding_backend == "achilles":
+        checkpoint = Path(__file__).resolve().parent / "dependency" / "trained_model.pt"
+        return {
+            "backend": "achilles",
+            "path": "dependency/trained_model.pt",
+            "sha256": _sha256_file(checkpoint),
+        }
+    if embedding_backend == "esm2":
+        if encoded_csv is None:
+            raise ValueError("encoded_csv is required for ESM-2 provenance")
+        from bcr_embeddings import esm2_metadata_path
+
+        metadata_path = esm2_metadata_path(encoded_csv)
+        if not metadata_path.is_file():
+            raise RuntimeError(f"missing ESM-2 provenance sidecar: {metadata_path}")
+        identity = json.loads(metadata_path.read_text())
+        if identity.get("backend") != "esm2":
+            raise RuntimeError(f"invalid ESM-2 provenance sidecar: {metadata_path}")
+        return identity
+    raise ValueError(f"unknown embedding backend {embedding_backend!r}")
 
 
 def _validate_params(params: BenisseParams) -> None:
@@ -392,6 +431,10 @@ def run_csv_pipeline(
     *,
     params: BenisseParams | None = None,
     cuda: bool = False,
+    embedding_backend: str = "achilles",
+    embedding_model: str | None = None,
+    embedding_batch_size: int = 64,
+    embedding_offline: bool = False,
     generate_plots: bool = True,
     max_nodes: int = 2000,
 ) -> NativePipelineResult:
@@ -399,7 +442,13 @@ def run_csv_pipeline(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     encoded_csv = encode_bcr_csv(
-        encoder_input_csv, output_dir / "encoded.csv", cuda=cuda
+        encoder_input_csv,
+        output_dir / "encoded.csv",
+        cuda=cuda,
+        embedding_backend=embedding_backend,
+        embedding_model=embedding_model,
+        embedding_batch_size=embedding_batch_size,
+        embedding_offline=embedding_offline,
     )
     return run_encoded_csv_pipeline(
         expression_csv,
@@ -412,7 +461,7 @@ def run_csv_pipeline(
         provenance={
             "encoder_input_csv": str(Path(encoder_input_csv)),
             "inputs_sha256": _file_hashes(encoder_input_csv=encoder_input_csv),
-            "encoder_model": _encoder_model_identity(),
+            "encoder_model": _encoder_model_identity(embedding_backend, encoded_csv),
         },
     )
 
@@ -493,6 +542,10 @@ def run_mudata_pipeline(
     sample_id=None,
     expression_layer="X",
     cuda=False,
+    embedding_backend="achilles",
+    embedding_model=None,
+    embedding_batch_size=64,
+    embedding_offline=False,
     generate_plots=True,
     max_nodes=500,
 ) -> tuple[Any, NativePipelineResult]:
@@ -520,7 +573,13 @@ def run_mudata_pipeline(
     encoder_heavy = heavy.loc[~heavy["junction_aa"].astype(str).duplicated()].copy()
     aa.write_encoder_input_csv(encoder_heavy, encoder_input)
     encoded_csv = encode_bcr_csv(
-        encoder_input, output_dir / "encoded.csv", cuda=cuda
+        encoder_input,
+        output_dir / "encoded.csv",
+        cuda=cuda,
+        embedding_backend=embedding_backend,
+        embedding_model=embedding_model,
+        embedding_batch_size=embedding_batch_size,
+        embedding_offline=embedding_offline,
     )
     encoded = pd.read_csv(encoded_csv)
     if params is None:
@@ -546,10 +605,11 @@ def run_mudata_pipeline(
             "sample_id": None if sample_id is None else str(sample_id),
             "expression_layer": expression_layer,
             "inputs_sha256": source_hashes,
-            "encoder_model": _encoder_model_identity(),
+            "encoder_model": _encoder_model_identity(embedding_backend, encoded_csv),
         },
     )
-    lookup = encoded.set_index(encoded["index"].astype(str))[list(map(str, range(20)))]
+    feature_columns = embedding_feature_columns(encoded)
+    lookup = encoded.set_index(encoded["index"].astype(str))[list(feature_columns)]
     cell_embedding = lookup.loc[heavy["junction_aa"].astype(str)].copy()
     cell_embedding.index = heavy.index
     aa.attach_embedding(mdata, cell_embedding)

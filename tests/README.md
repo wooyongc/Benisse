@@ -93,6 +93,17 @@ The regular NSCLC preprocessing test invokes R only to export frozen preparation
 pytest's temporary directory; the runtime integration test explicitly prevents the legacy bridge
 from being called. Full corrected-v2 revalidation is opt-in:
 
+The regular suite tests the ESM-2 dispatcher, pooling, normalization, dynamic
+embedding dimensions, cache checks, and provenance with a hermetic fake model.
+It never imports `fair-esm` or downloads model weights. Run the separately
+gated real 35M-model smoke test after installing `requirements-esm2.txt`:
+
+```sh
+BENISSE_RUN_ESM2_TESTS=1 conda run -n benisse-scirpy022 \
+  python -m pytest tests/test_bcr_embeddings.py \
+  -k real_esm2 -v -s
+```
+
 ```sh
 BENISSE_RUN_NATIVE_EXAMPLE=1 conda run -n benisse-scirpy022 \
   python -m pytest tests/test_native_pipeline.py -k native_nsclc -v
